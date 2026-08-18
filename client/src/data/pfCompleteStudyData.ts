@@ -1,11 +1,13 @@
 /* Estudos PF — Trilha integral, organizada como dossiê de estudo acelerado. */
 import type { Block, StudyModule } from "./pfStudyData";
+import { interactiveLessons, type InteractiveLesson } from "./pfLearningLessons";
 
 export type DetailedStudyModule = StudyModule & {
   estimatedMinutes: number;
   fastTrack: string[];
   mnemonic: string;
   checklist: string[];
+  lesson: InteractiveLesson;
 };
 
 const edital = "Edital PF 2025, Anexo II — Cargo 16: Agente de Polícia Federal.";
@@ -15,7 +17,7 @@ function module(
   concepts: string[], attention: string[], example: string, estimatedMinutes: number,
   fastTrack: string[], mnemonic: string, checklist: string[],
 ): DetailedStudyModule {
-  return { id, discipline, block, code, title, summary, concepts, attention, example, source: edital, estimatedMinutes, fastTrack, mnemonic, checklist };
+  return { id, discipline, block, code, title, summary, concepts, attention, example, source: edital, estimatedMinutes, fastTrack, mnemonic, checklist, lesson: interactiveLessons[id] };
 }
 
 export const completeStudyModules: DetailedStudyModule[] = [

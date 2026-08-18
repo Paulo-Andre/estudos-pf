@@ -6,3 +6,11 @@
 - [x] Criar resumos, exemplos, alertas de pegadinha e gatilhos de memorização para todos os tópicos.
 - [x] Integrar a nova base de conteúdo e a navegação de revisão rápida à plataforma.
 - [x] Validar compilação, cobertura e comportamento responsivo antes da entrega.
+
+## Curso interativo completo
+
+- [x] Definir a estrutura pedagógica padrão: explicação, analogia, exemplo resolvido, prática e revisão ativa.
+- [x] Converter os módulos de Língua Portuguesa, Raciocínio Lógico, Estatística e Informática em aulas completas.
+- [x] Criar desafios de aprendizagem com feedback imediato e explicação didática por lição.
+- [x] Converter Direito Administrativo, Constitucional, Penal/Processual, Direitos Humanos, Legislação Especial e Contabilidade em aulas completas.
+- [x] Validar que a experiência permita estudar o conteúdo diretamente no site, em desktop e celular.
