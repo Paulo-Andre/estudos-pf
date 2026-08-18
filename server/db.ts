@@ -90,6 +90,7 @@ export async function upsertUser(user: UserUpsertInput): Promise<void> {
     openId: user.openId,
     name: user.name?.trim() || "Usuário Estudos PF",
     loginMethod: user.loginMethod || "oauth",
+    role: user.role ?? "user",
     lastSignedIn: user.lastSignedIn ?? new Date(),
   };
   const updateSet: Record<string, unknown> = { lastSignedIn: values.lastSignedIn };

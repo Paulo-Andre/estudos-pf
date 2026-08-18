@@ -7,6 +7,7 @@ import { SignJWT, jwtVerify } from "jose";
 import type { User } from "../../drizzle/schema";
 import * as db from "../db";
 import { ENV } from "./env";
+import { isConfiguredRootIdentity } from "../auth/rootConfig";
 import type {
   ExchangeTokenRequest,
   ExchangeTokenResponse,
@@ -298,6 +299,7 @@ class SDKServer {
           name: userInfo.name || null,
           email: userInfo.email ?? null,
           loginMethod: userInfo.loginMethod ?? userInfo.platform ?? null,
+          role: isConfiguredRootIdentity(userInfo.openId) ? "admin" : undefined,
           lastSignedIn: signedInAt,
         });
         user = await db.getUserByOpenId(userInfo.openId);

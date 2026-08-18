@@ -4,6 +4,7 @@ import type { Express, Request, Response } from "express";
 import * as db from "../db";
 import { getSessionCookieOptions } from "./cookies";
 import { sdk } from "./sdk";
+import { isConfiguredRootIdentity } from "../auth/rootConfig";
 
 function getQueryParam(req: Request, key: string): string | undefined {
   const value = req.query[key];
@@ -45,6 +46,9 @@ export function registerOAuthRoutes(app: Express) {
         name: userInfo.name || null,
         email: userInfo.email ?? null,
         loginMethod: userInfo.loginMethod ?? userInfo.platform ?? null,
+        // A identidade do proprietário é a única conta OAuth promovida a ROOT.
+        // Usuários OAuth comuns continuam com o papel padrão "user".
+        role: isConfiguredRootIdentity(userInfo.openId) ? "admin" : undefined,
         lastSignedIn: new Date(),
       });
 
