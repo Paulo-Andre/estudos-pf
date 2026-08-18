@@ -4,6 +4,7 @@ import {
   adminAuditLogs,
   authSessions,
   completedModules,
+  courseEnrollments,
   InsertUser,
   simulationRecords,
   studyAnswers,
@@ -11,6 +12,7 @@ import {
   studyProfiles,
   users,
 } from "../drizzle/schema";
+import { getEnrollmentLifecycleStatus } from "./enrollmentStatus";
 
 type UserUpsertInput = {
   openId: string;
@@ -364,4 +366,56 @@ export async function listAdminAuditLogs() {
   const db = await getDb();
   if (!db) throw new Error("Banco de dados indisponível");
   return db.select().from(adminAuditLogs).orderBy(desc(adminAuditLogs.createdAt)).limit(100);
+}
+
+function serializeEnrollment(enrollment: typeof courseEnrollments.$inferSelect) {
+  return { ...enrollment, computedStatus: getEnrollmentLifecycleStatus(enrollment) };
+}
+
+export async function listUserEnrollments(userId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Banco de dados indisponível");
+  const rows = await db.select().from(courseEnrollments).where(eq(courseEnrollments.userId, userId)).orderBy(desc(courseEnrollments.createdAt));
+  return rows.map(serializeEnrollment);
+}
+
+export async function getUserCourseAccess(userId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Banco de dados indisponível");
+  const rows = await db.select().from(courseEnrollments).where(and(
+    eq(courseEnrollments.userId, userId),
+    eq(courseEnrollments.status, "active"),
+    sql`${courseEnrollments.startAt} <= NOW()`,
+    sql`${courseEnrollments.expiresAt} > NOW()`,
+  ));
+  return rows.map(serializeEnrollment);
+}
+
+export async function grantCourseEnrollment(actorUserId: number, userId: number, courseId: string, startAt: Date, expiresAt: Date) {
+  const db = await getDb();
+  if (!db) throw new Error("Banco de dados indisponível");
+  const existing = await db.select().from(courseEnrollments).where(and(eq(courseEnrollments.userId, userId), eq(courseEnrollments.courseId, courseId))).limit(1);
+  let enrollment;
+  if (existing[0]) {
+    await db.update(courseEnrollments).set({ startAt, expiresAt, status: "active", revokedAt: null }).where(eq(courseEnrollments.id, existing[0].id));
+    enrollment = await db.select().from(courseEnrollments).where(eq(courseEnrollments.id, existing[0].id)).limit(1);
+  } else {
+    const result = await db.insert(courseEnrollments).values({ userId, courseId, startAt, expiresAt, status: "active", createdByUserId: actorUserId });
+    enrollment = await db.select().from(courseEnrollments).where(eq(courseEnrollments.id, result[0].insertId)).limit(1);
+  }
+  const saved = enrollment[0];
+  if (!saved) throw new Error("Matrícula não foi salva");
+  await writeAdminAudit(actorUserId, userId, "LIBERACAO_DE_CURSO", `Curso ${courseId} liberado de ${startAt.toISOString()} até ${expiresAt.toISOString()}.`);
+  return serializeEnrollment(saved);
+}
+
+export async function revokeCourseEnrollment(actorUserId: number, userId: number, courseId: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Banco de dados indisponível");
+  const existing = await db.select().from(courseEnrollments).where(and(eq(courseEnrollments.userId, userId), eq(courseEnrollments.courseId, courseId))).limit(1);
+  if (!existing[0]) throw new Error("Matrícula não encontrada");
+  await db.update(courseEnrollments).set({ status: "revoked", revokedAt: new Date() }).where(eq(courseEnrollments.id, existing[0].id));
+  await writeAdminAudit(actorUserId, userId, "REVOGACAO_DE_CURSO", `Curso ${courseId} revogado.`);
+  const updated = await db.select().from(courseEnrollments).where(eq(courseEnrollments.id, existing[0].id)).limit(1);
+  return updated[0] ? serializeEnrollment(updated[0]) : null;
 }

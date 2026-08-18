@@ -92,13 +92,23 @@ function StudyWorkspace({ user, logout }: { user: { name: string; username: stri
   const [simulationResult, setSimulationResult] = useState<SimulationRecord | null>(null);
   const [accountOpen, setAccountOpen] = useState(false);
   const [adminOpen, setAdminOpen] = useState(false);
-  const activeContest = getContestById(contestId) ?? contestCatalog[0];
-  const unlockedDisciplineIds = useMemo(() => new Set(getDisciplinesForContest(contestId).map((discipline) => discipline.id)), [contestId]);
+  const accessQuery = trpc.study.access.useQuery(undefined, { refetchOnWindowFocus: false });
+  const permittedContestIds = useMemo<ContestId[]>(() => {
+    if (user.role === "admin") return contestCatalog.map((contest) => contest.id);
+    return (accessQuery.data ?? []).map((enrollment) => enrollment.courseId).filter((courseId): courseId is ContestId => contestCatalog.some((contest) => contest.id === courseId));
+  }, [accessQuery.data, user.role]);
+  const effectiveContestId = permittedContestIds.includes(contestId) ? contestId : (permittedContestIds[0] ?? activeContestId);
+  const activeContest = getContestById(effectiveContestId) ?? contestCatalog[0];
+  const unlockedDisciplineIds = useMemo(() => new Set(getDisciplinesForContest(effectiveContestId).map((discipline) => discipline.id)), [effectiveContestId]);
   const availableModules = useMemo(() => studyModules.filter((module) => {
     const disciplineId = getDisciplineIdForModule(module);
     return disciplineId ? unlockedDisciplineIds.has(disciplineId) : false;
   }), [unlockedDisciplineIds]);
   const availableModuleIds = useMemo(() => new Set(availableModules.map((module) => module.id)), [availableModules]);
+
+  useEffect(() => {
+    if (permittedContestIds.length && !permittedContestIds.includes(contestId)) setContestId(permittedContestIds[0]);
+  }, [contestId, permittedContestIds]);
 
   useEffect(() => {
     window.localStorage.setItem("estudos-pf-active-contest", contestId);
@@ -127,6 +137,9 @@ function StudyWorkspace({ user, logout }: { user: { name: string; username: stri
     return { label, detail: `Seu aproveitamento atual é ${percentage(metric.correct, metric.total)}%. Revise esse eixo antes de avançar.` };
   }, [disciplinePerformance]);
   const historyChart = state.simulations.slice(-6).map((sim, index) => ({ label: `S${state.simulations.length - 5 + index}`, score: percentage(sim.correct, sim.total) }));
+
+  if (user.role !== "admin" && accessQuery.isLoading) return <div className="grid min-h-screen place-items-center bg-[#152d38] text-sm font-bold text-[#e8e4d9]">Verificando matrícula...</div>;
+  if (user.role !== "admin" && !accessQuery.data?.length) return <CourseAccessRequired userName={user.name} onLogout={logout} />;
 
   function updateState(updater: (current: StudyState) => StudyState) { setState((current) => updater(current)); }
 
@@ -207,7 +220,7 @@ function StudyWorkspace({ user, logout }: { user: { name: string; username: stri
           <div className="flex items-center gap-3"><button className="grid h-10 w-10 place-items-center rounded-xl border border-[#d5cdbd] bg-[#fffdf8] lg:hidden" onClick={() => setMenuOpen(true)}><Menu className="h-5 w-5" /></button><div><p className="eyebrow">CONCURSO · {activeContest.name.toUpperCase()}</p><h1 className="font-display text-base font-bold text-[#183542]">{view}</h1></div></div>
           <div className="flex items-center gap-3"><div className="hidden items-center gap-2 rounded-xl border border-[#d6cfc2] bg-[#fffdf8] px-3 py-2 sm:flex"><Flame className="h-4 w-4 text-[#d2823b]" /><span className="text-xs font-bold">{streak} dia{streak === 1 ? "" : "s"}</span></div><button onClick={() => setAccountOpen(true)} className="hidden text-right sm:block"><p className="text-xs font-bold text-[#183542]">{user.name}</p><p className="text-[9px] font-bold tracking-wider text-[#5d777d]">{user.role === "admin" ? "ROOT / ADMIN" : "CONTA PRIVADA"}</p></button>{user.role === "admin" && <button onClick={() => setAdminOpen(true)} className="hidden border border-[#8ab9b0] bg-[#e8f3f0] px-2.5 py-2 text-[10px] font-bold tracking-wide text-[#0e5a70] sm:block">ROOT</button>}<button onClick={() => void logout()} className="border border-[#d6cfc2] bg-[#fffdf8] px-2.5 py-2 text-[10px] font-bold tracking-wide text-[#0e5a70] hover:bg-[#eef6f3]">SAIR</button><button onClick={() => setAccountOpen(true)} className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#0e5a70] text-sm font-bold text-white">{level.index}</button></div>
         </header>
-        <div className="mx-auto max-w-[1540px] p-4 sm:p-7 lg:p-10"><ContestSelector contestId={contestId} onChange={setContestId} />{simulation ? <SimulationScreen simulation={simulation} onAnswer={submitSimulationAnswer} onExit={() => setSimulation(null)} /> : simulationResult ? <SimulationResult result={simulationResult} onAgain={() => startSimulation(simulationResult.total)} onClose={() => { setSimulationResult(null); setView("Histórico"); }} /> : <>
+        <div className="mx-auto max-w-[1540px] p-4 sm:p-7 lg:p-10"><ContestSelector contestId={effectiveContestId} allowedContestIds={permittedContestIds} onChange={setContestId} />{simulation ? <SimulationScreen simulation={simulation} onAnswer={submitSimulationAnswer} onExit={() => setSimulation(null)} /> : simulationResult ? <SimulationResult result={simulationResult} onAgain={() => startSimulation(simulationResult.total)} onClose={() => { setSimulationResult(null); setView("Histórico"); }} /> : <>
           {view === "Painel" && <Dashboard state={state} modules={availableModules} contestName={activeContest.name} level={level} totalAnswers={totalAnswers} overallScore={overallScore} streak={streak} studiedPercent={studiedPercent} focus={focus} historyChart={historyChart} onStudy={() => setView("Conteúdo")} onSimulate={() => setView("Simulados")} />}
           {view === "Conteúdo" && <StudyArea state={state} modules={availableModules} contestName={activeContest.name} onOpen={setOpenedModule} />}
           {view === "Simulados" && <Simulations onStart={startSimulation} state={state} />}
@@ -223,10 +236,14 @@ function StudyWorkspace({ user, logout }: { user: { name: string; username: stri
   );
 }
 
-function ContestSelector({ contestId, onChange }: { contestId: ContestId; onChange: (contestId: ContestId) => void }) {
+function CourseAccessRequired({ userName, onLogout }: { userName: string; onLogout: () => Promise<void> }) {
+  return <div className="grid min-h-screen place-items-center bg-[#f5f1e8] p-5 text-[#152d38]"><section className="w-full max-w-xl border border-[#c9dbd6] bg-[#fffdf8] p-7 shadow-xl sm:p-10"><div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-[#e8f3f0] text-[#0e5a70]"><LockKeyhole className="h-6 w-6" /></div><p className="eyebrow text-[#176a5a]">MATRÍCULA NECESSÁRIA</p><h1 className="font-display mt-2 text-2xl font-extrabold text-[#173d4a]">Olá, {userName}.</h1><p className="mt-4 text-sm leading-6 text-[#5b7073]">Sua conta ainda não possui um curso liberado ou todas as matrículas estão fora do período válido. O acesso é liberado individualmente pela administração após a confirmação da compra.</p><div className="mt-6 border-l-2 border-[#82cfbf] bg-[#edf8f4] p-4 text-xs leading-5 text-[#17644e]">Quando o curso for liberado, você poderá estudar todas as disciplinas da matriz durante o período definido pelo administrador.</div><button onClick={() => void onLogout()} className="mt-7 border border-[#0e5a70] px-4 py-2 text-xs font-bold tracking-wide text-[#0e5a70] hover:bg-[#e8f3f0]">SAIR DA CONTA</button></section></div>;
+}
+
+function ContestSelector({ contestId, allowedContestIds, onChange }: { contestId: ContestId; allowedContestIds: ContestId[]; onChange: (contestId: ContestId) => void }) {
   const contest = getContestById(contestId) ?? contestCatalog[0];
   const disciplines = getDisciplinesForContest(contestId);
-  return <section className="mb-6 flex flex-col gap-4 rounded-2xl border border-[#c8dcd6] bg-[#e8f3f0] p-4 sm:flex-row sm:items-center sm:justify-between sm:px-5"><div><p className="eyebrow text-[#176a5a]">MATRIZ DE ESTUDO</p><p className="font-display mt-1 text-lg font-bold text-[#173d4a]">{contest.name} · {contest.role}</p><p className="mt-1 text-xs leading-5 text-[#52716f]">A seleção define quais disciplinas do catálogo ficam visíveis nesta trilha. O conteúdo pode ser compartilhado com outros concursos sem duplicação; matrizes futuras permanecem em revisão até serem ativadas.</p></div><div className="flex items-center gap-3"><span className="hidden text-right text-[10px] font-bold uppercase tracking-wider text-[#52716f] sm:block">{disciplines.length} disciplinas</span><select aria-label="Selecionar concurso" value={contestId} onChange={(event) => onChange(event.target.value as ContestId)} className="min-w-[220px] rounded-xl border border-[#a9cfc4] bg-[#fffdf8] px-3 py-2 text-sm font-bold text-[#173d4a] outline-none focus:ring-2 focus:ring-[#82cfbf]">{contestCatalog.map((item) => <option key={item.id} value={item.id} disabled={item.status === "planned"}>{item.name} · {item.role}{item.status === "planned" ? " · em preparação" : ""}</option>)}</select></div></section>;
+  return <section className="mb-6 flex flex-col gap-4 rounded-2xl border border-[#c8dcd6] bg-[#e8f3f0] p-4 sm:flex-row sm:items-center sm:justify-between sm:px-5"><div><p className="eyebrow text-[#176a5a]">MATRIZ DE ESTUDO</p><p className="font-display mt-1 text-lg font-bold text-[#173d4a]">{contest.name} · {contest.role}</p><p className="mt-1 text-xs leading-5 text-[#52716f]">A seleção define quais disciplinas do catálogo ficam visíveis nesta trilha. O conteúdo pode ser compartilhado com outros concursos sem duplicação; matrizes futuras permanecem em revisão até serem ativadas.</p></div><div className="flex items-center gap-3"><span className="hidden text-right text-[10px] font-bold uppercase tracking-wider text-[#52716f] sm:block">{disciplines.length} disciplinas</span><select aria-label="Selecionar concurso" value={contestId} onChange={(event) => onChange(event.target.value as ContestId)} className="min-w-[220px] rounded-xl border border-[#a9cfc4] bg-[#fffdf8] px-3 py-2 text-sm font-bold text-[#173d4a] outline-none focus:ring-2 focus:ring-[#82cfbf]">{contestCatalog.map((item) => <option key={item.id} value={item.id} disabled={!allowedContestIds.includes(item.id)}>{item.name} · {item.role}{item.status === "planned" ? " · em preparação" : ""}{!allowedContestIds.includes(item.id) ? " · não liberado" : ""}</option>)}</select></div></section>;
 }
 
 function Dashboard({ state, modules, contestName, level, totalAnswers, overallScore, streak, studiedPercent, focus, historyChart, onStudy, onSimulate }: { state: StudyState; modules: StudyModule[]; contestName: string; level: ReturnType<typeof levelFromXp>; totalAnswers: number; overallScore: number; streak: number; studiedPercent: number; focus: { label: string; detail: string }; historyChart: { label: string; score: number }[]; onStudy: () => void; onSimulate: () => void }) {

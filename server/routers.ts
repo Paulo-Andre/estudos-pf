@@ -12,10 +12,13 @@ import {
   deleteSessionByHash,
   getAdminStats,
   getStudyState,
+  getUserCourseAccess,
+  grantCourseEnrollment,
   getUserByIdentifier,
   getUserByUsername,
   listAdminAuditLogs,
   listManagedUsers,
+  listUserEnrollments,
   recordAnswer,
   recordSimulation,
   saveNote,
@@ -36,6 +39,12 @@ const profileSchema = z.object({
   email: z.string().trim().toLowerCase().email("Informe um e-mail válido.").max(320),
 });
 const metricSchema = z.record(z.string(), z.object({ correct: z.number().int().nonnegative(), total: z.number().int().nonnegative() }));
+const enrollmentSchema = z.object({
+  userId: z.number().int().positive(),
+  courseId: z.string().trim().min(1).max(80),
+  startAt: z.coerce.date(),
+  expiresAt: z.coerce.date(),
+}).refine(input => input.expiresAt > input.startAt, { message: "A data de vencimento deve ser posterior ao início.", path: ["expiresAt"] });
 
 function safeUser(user: NonNullable<Parameters<typeof getStudyState>[0]> extends never ? never : any) {
   return {
@@ -107,6 +116,7 @@ export const appRouter = router({
   }),
   study: router({
     state: protectedProcedure.query(({ ctx }) => getStudyState(ctx.user.id)),
+    access: protectedProcedure.query(({ ctx }) => getUserCourseAccess(ctx.user.id)),
     answer: protectedProcedure.input(z.object({ questionId: z.string().trim().min(1).max(80), correct: z.boolean() })).mutation(({ input, ctx }) => recordAnswer(ctx.user.id, input.questionId, input.correct)),
     completeModule: protectedProcedure.input(z.object({ moduleId: z.string().trim().min(1).max(80) })).mutation(({ input, ctx }) => completeStudyModule(ctx.user.id, input.moduleId)),
     submitSimulation: protectedProcedure.input(z.object({
@@ -122,6 +132,9 @@ export const appRouter = router({
     users: adminProcedure.input(z.object({ search: z.string().trim().max(80).optional() })).query(({ input }) => listManagedUsers(input.search)),
     stats: adminProcedure.query(() => getAdminStats()),
     auditLogs: adminProcedure.query(() => listAdminAuditLogs()),
+    enrollments: adminProcedure.input(z.object({ userId: z.number().int().positive() })).query(({ input }) => listUserEnrollments(input.userId)),
+    grantEnrollment: adminProcedure.input(enrollmentSchema).mutation(async ({ input, ctx }) => grantCourseEnrollment(ctx.user.id, input.userId, input.courseId, input.startAt, input.expiresAt)),
+    revokeEnrollment: adminProcedure.input(z.object({ userId: z.number().int().positive(), courseId: z.string().trim().min(1).max(80) })).mutation(({ input, ctx }) => import("./db").then(({ revokeCourseEnrollment }) => revokeCourseEnrollment(ctx.user.id, input.userId, input.courseId))),
     updateUser: adminProcedure.input(z.object({ userId: z.number().int().positive(), profile: profileSchema })).mutation(async ({ input, ctx }) => {
       const user = await updateManagedUser(input.userId, input.profile);
       if (!user) throw new TRPCError({ code: "NOT_FOUND", message: "Conta não encontrada." });

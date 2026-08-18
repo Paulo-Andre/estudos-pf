@@ -90,6 +90,25 @@ export const adminAuditLogs = mysqlTable("adminAuditLogs", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 }, table => [index("adminAudit_actor_idx").on(table.actorUserId), index("adminAudit_affected_idx").on(table.affectedUserId)]);
 
+/** Matrícula individual: uma conta pode ter cursos diferentes e renová-los por período. */
+export const courseEnrollments = mysqlTable("courseEnrollments", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  courseId: varchar("courseId", { length: 80 }).notNull(),
+  startAt: timestamp("startAt").notNull(),
+  expiresAt: timestamp("expiresAt").notNull(),
+  status: mysqlEnum("status", ["active", "revoked"]).notNull().default("active"),
+  createdByUserId: int("createdByUserId").notNull(),
+  revokedAt: timestamp("revokedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => [
+  uniqueIndex("courseEnrollments_user_course_unique").on(table.userId, table.courseId),
+  index("courseEnrollments_user_idx").on(table.userId),
+  index("courseEnrollments_expiry_idx").on(table.expiresAt),
+]);
+
 export type User = typeof users.$inferSelect;
+export type CourseEnrollment = typeof courseEnrollments.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 export type StudyProfile = typeof studyProfiles.$inferSelect;
