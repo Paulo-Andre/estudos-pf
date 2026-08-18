@@ -14,7 +14,12 @@ import { blocks, questionBank, StudyQuestion } from "@/data/pfStudyData";
 import { completeStudyModules as studyModules, DetailedStudyModule as StudyModule } from "@/data/pfCompleteStudyData";
 import { apostilaByModule } from "@/data/pfApostilaData";
 import { ApostilaModulePanel } from "@/components/ApostilaModulePanel";
-import { AnswerRecord, currentStreak, emptyState, levelFromXp, loadState, saveState, selectSimulationQuestions, SimulationRecord, StudyState } from "@/lib/studyEngine";
+import { AnswerRecord, currentStreak, emptyState, levelFromXp, selectSimulationQuestions, SimulationRecord, StudyState } from "@/lib/studyEngine";
+import { useAuth } from "@/_core/hooks/useAuth";
+import AccessGate from "@/pages/AccessGate";
+import { trpc } from "@/lib/trpc";
+import { AccountPanel } from "@/components/AccountPanel";
+import { AdminPanel } from "@/components/AdminPanel";
 
 type View = "Painel" | "Estudar" | "Simulados" | "Revisar" | "Histórico";
 type ActiveSimulation = { questions: StudyQuestion[]; index: number; answers: Record<string, boolean>; startedAt: number } | null;
@@ -52,6 +57,21 @@ function getDisciplinePerformance(state: StudyState) {
 }
 
 export default function Home() {
+  // The useAuth hook provides authentication state.
+  // To implement login/logout, call logout(), or start login from an event
+  // handler: onClick={() => startLogin()} (imported from "@/const"). Never call
+  // startLogin() during render (no href={startLogin()}) — it mints a one-time
+  // nonce cookie and must run only at the moment of navigation.
+  const { user, loading, isAuthenticated, logout } = useAuth();
+
+  if (loading) return <div className="grid min-h-screen place-items-center bg-[#152d38] text-sm font-bold text-[#e8e4d9]">Carregando credencial...</div>;
+  if (!isAuthenticated) return <AccessGate onAuthenticated={() => window.location.reload()} />;
+
+  return <StudyWorkspace user={user!} logout={logout} />;
+}
+
+function StudyWorkspace({ user, logout }: { user: { name: string; username: string | null; email: string | null; role: "user" | "admin" }; logout: () => Promise<void> }) {
+
   const [state, setState] = useState<StudyState>(emptyState);
   const [view, setView] = useState<View>("Painel");
   const [menuOpen, setMenuOpen] = useState(false);
@@ -60,9 +80,17 @@ export default function Home() {
   const [quickAnswer, setQuickAnswer] = useState<boolean | null>(null);
   const [simulation, setSimulation] = useState<ActiveSimulation>(null);
   const [simulationResult, setSimulationResult] = useState<SimulationRecord | null>(null);
+  const [accountOpen, setAccountOpen] = useState(false);
+  const [adminOpen, setAdminOpen] = useState(false);
 
-  useEffect(() => { setState(loadState()); }, []);
-  useEffect(() => { if (state !== emptyState) saveState(state); }, [state]);
+  const privateState = trpc.study.state.useQuery(undefined, { refetchOnWindowFocus: false });
+  const answerMutation = trpc.study.answer.useMutation();
+  const moduleMutation = trpc.study.completeModule.useMutation();
+  const simulationMutation = trpc.study.submitSimulation.useMutation();
+
+  useEffect(() => {
+    if (privateState.data) setState(privateState.data as StudyState);
+  }, [privateState.data]);
 
   const level = levelFromXp(state.xp);
   const totalAnswers = state.answers.length;
@@ -90,12 +118,14 @@ export default function Home() {
       studyDates: current.studyDates.includes(today) ? current.studyDates : [...current.studyDates, today],
       lastStudyDate: today,
     }));
+    answerMutation.mutate({ questionId: question.id, correct }, { onSuccess: serverState => setState(serverState as StudyState) });
   }
 
   function completeModule(module: StudyModule) {
     if (state.completedModules.includes(module.id)) return;
     const today = new Date().toISOString().slice(0, 10);
     updateState((current) => ({ ...current, completedModules: [...current.completedModules, module.id], xp: current.xp + 20, studyDates: current.studyDates.includes(today) ? current.studyDates : [...current.studyDates, today], lastStudyDate: today }));
+    moduleMutation.mutate({ moduleId: module.id }, { onSuccess: serverState => setState(serverState as StudyState) });
   }
 
   function startSimulation(total: number) {
@@ -128,6 +158,7 @@ export default function Home() {
     const result: SimulationRecord = { id: `sim-${Date.now()}`, date: new Date().toISOString(), total: simulation.questions.length, correct, errors: simulation.questions.length - correct, elapsedSeconds: Math.round((Date.now() - simulation.startedAt) / 1000), byDiscipline, byBlock };
     const today = new Date().toISOString().slice(0, 10);
     updateState((current) => ({ ...current, xp: current.xp + correct * 8 + 15, simulations: [...current.simulations, result], answers: [...current.answers, ...answerRecords], usedQuestionIds: Array.from(new Set([...current.usedQuestionIds, ...simulation.questions.map((item) => item.id)])), studyDates: current.studyDates.includes(today) ? current.studyDates : [...current.studyDates, today], lastStudyDate: today }));
+    simulationMutation.mutate({ id: result.id, total: result.total, correct: result.correct, errors: result.errors, elapsedSeconds: result.elapsedSeconds, byDiscipline: result.byDiscipline, byBlock: result.byBlock, answers: answerRecords.map(answer => ({ questionId: answer.questionId, correct: answer.correct })), questionIds: simulation.questions.map(item => item.id) }, { onSuccess: serverState => setState(serverState as StudyState) });
     setSimulation(null);
     setSimulationResult(result);
   }
@@ -153,7 +184,7 @@ export default function Home() {
       <main className="min-h-screen min-w-0 flex-1">
         <header className="sticky top-0 z-20 flex h-[72px] items-center justify-between border-b border-[#dcd6ca] bg-[#f5f1e8]/90 px-4 backdrop-blur-md sm:px-7 lg:px-10">
           <div className="flex items-center gap-3"><button className="grid h-10 w-10 place-items-center rounded-xl border border-[#d5cdbd] bg-[#fffdf8] lg:hidden" onClick={() => setMenuOpen(true)}><Menu className="h-5 w-5" /></button><div><p className="eyebrow">CONCURSO · AGENTE PF · 2025</p><h1 className="font-display text-base font-bold text-[#183542]">{view}</h1></div></div>
-          <div className="flex items-center gap-3"><div className="hidden items-center gap-2 rounded-xl border border-[#d6cfc2] bg-[#fffdf8] px-3 py-2 sm:flex"><Flame className="h-4 w-4 text-[#d2823b]" /><span className="text-xs font-bold">{streak} dia{streak === 1 ? "" : "s"}</span></div><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#0e5a70] text-sm font-bold text-white">{level.index}</div></div>
+          <div className="flex items-center gap-3"><div className="hidden items-center gap-2 rounded-xl border border-[#d6cfc2] bg-[#fffdf8] px-3 py-2 sm:flex"><Flame className="h-4 w-4 text-[#d2823b]" /><span className="text-xs font-bold">{streak} dia{streak === 1 ? "" : "s"}</span></div><button onClick={() => setAccountOpen(true)} className="hidden text-right sm:block"><p className="text-xs font-bold text-[#183542]">{user.name}</p><p className="text-[9px] font-bold tracking-wider text-[#5d777d]">{user.role === "admin" ? "ROOT / ADMIN" : "CONTA PRIVADA"}</p></button>{user.role === "admin" && <button onClick={() => setAdminOpen(true)} className="hidden border border-[#8ab9b0] bg-[#e8f3f0] px-2.5 py-2 text-[10px] font-bold tracking-wide text-[#0e5a70] sm:block">ROOT</button>}<button onClick={() => void logout()} className="border border-[#d6cfc2] bg-[#fffdf8] px-2.5 py-2 text-[10px] font-bold tracking-wide text-[#0e5a70] hover:bg-[#eef6f3]">SAIR</button><button onClick={() => setAccountOpen(true)} className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#0e5a70] text-sm font-bold text-white">{level.index}</button></div>
         </header>
         <div className="mx-auto max-w-[1540px] p-4 sm:p-7 lg:p-10">{simulation ? <SimulationScreen simulation={simulation} onAnswer={submitSimulationAnswer} onExit={() => setSimulation(null)} /> : simulationResult ? <SimulationResult result={simulationResult} onAgain={() => startSimulation(simulationResult.total)} onClose={() => { setSimulationResult(null); setView("Histórico"); }} /> : <>
           {view === "Painel" && <Dashboard state={state} level={level} totalAnswers={totalAnswers} overallScore={overallScore} streak={streak} studiedPercent={studiedPercent} focus={focus} historyChart={historyChart} onStudy={() => setView("Estudar")} onSimulate={() => setView("Simulados")} />}
@@ -165,6 +196,8 @@ export default function Home() {
       </main>
       {view === "Painel" && !simulation && !simulationResult && <QuickCheck question={quickQuestion} answer={quickAnswer} correct={quickCorrect} onAnswer={(answer) => { setQuickAnswer(answer); registerAnswer(quickQuestion, answer === quickQuestion.answer); }} onNext={() => { const currentIndex = questionBank.findIndex((item) => item.id === quickQuestion.id); setQuickQuestion(questionBank[(currentIndex + 1) % questionBank.length]); setQuickAnswer(null); }} />}
       {openedModule && <ModulePanel module={openedModule} completed={state.completedModules.includes(openedModule.id)} onComplete={() => completeModule(openedModule)} onClose={() => setOpenedModule(null)} />}
+      {accountOpen && <AccountPanel user={user} onClose={() => setAccountOpen(false)} />}
+      {adminOpen && user.role === "admin" && <AdminPanel onClose={() => setAdminOpen(false)} />}
     </div>
   );
 }
@@ -207,6 +240,6 @@ function SimulationResult({ result, onAgain, onClose }: { result: SimulationReco
 
 function ReviewArea({ state, onStartQuestion }: { state: StudyState; onStartQuestion: (question: StudyQuestion) => void }) { const latestRecords = new Map<string, AnswerRecord>(); state.answers.forEach((answer) => latestRecords.set(answer.questionId, answer)); const incorrect = Array.from(latestRecords.values()).filter((answer) => !answer.correct).map((answer) => questionBank.find((question) => question.id === answer.questionId)).filter(Boolean) as StudyQuestion[]; const untouchedModules = studyModules.filter((module) => !state.completedModules.includes(module.id)); const performance = getDisciplinePerformance(state); const weak = Object.entries(performance).filter(([, item]) => item.total > 0).sort((a, b) => percentage(a[1].correct, a[1].total) - percentage(b[1].correct, b[1].total)); return <div className="space-y-7"><section><p className="eyebrow">REVISÃO INTELIGENTE</p><h2 className="font-display mt-2 text-3xl font-extrabold">Recupere pontos onde eles importam.</h2><p className="mt-2 max-w-3xl text-sm leading-6 text-[#62727a]">A prioridade combina erros registrados, módulos ainda abertos e a matriz oficial do edital.</p></section><div className="grid gap-5 xl:grid-cols-[1.1fr_.9fr]"><section className="shell-card p-6"><div className="flex items-center justify-between"><div><p className="eyebrow">ITENS PARA REVISAR</p><h3 className="font-display mt-1 text-xl font-bold">Questões que exigem retorno</h3></div><RotateCcw className="h-5 w-5 text-[#0e5a70]" /></div>{incorrect.length ? <div className="mt-5 divide-y divide-[#e7dfd2]">{incorrect.slice(0, 6).map((question) => <div key={question.id} className="flex items-center justify-between gap-4 py-4"><div><p className="text-[10px] font-bold tracking-wider text-[#a06432]">{question.discipline} · {question.subject}</p><p className="mt-1 line-clamp-2 text-sm leading-5 text-[#536872]">{question.statement}</p></div><button onClick={() => onStartQuestion(question)} className="shrink-0 rounded-lg border border-[#d4cbc0] p-2 text-[#0e5a70]"><ChevronRight className="h-4 w-4" /></button></div>)}</div> : <EmptyState icon={ShieldCheck} title="Nenhum erro registrado" text="Responda uma checagem ou simulado; seus erros aparecerão aqui para revisão dirigida." />}</section><section className="shell-card p-6"><p className="eyebrow">MAPA DE FRAGILIDADES</p><h3 className="font-display mt-1 text-xl font-bold">Desempenho por disciplina</h3>{weak.length ? <div className="mt-5 space-y-4">{weak.map(([discipline, metric]) => <div key={discipline}><div className="flex justify-between gap-3 text-sm"><span className="font-medium">{discipline}</span><span className="font-bold text-[#0e5a70]">{percentage(metric.correct, metric.total)}%</span></div><div className="mt-2 h-2 overflow-hidden rounded-full bg-[#ece5d8]"><div className="h-full rounded-full bg-[#0e5a70]" style={{ width: `${percentage(metric.correct, metric.total)}%` }} /></div></div>)}</div> : <EmptyState icon={Target} title="Diagnóstico pendente" text="São necessárias respostas registradas para calcular suas prioridades." />}</section></div><section className="shell-card p-6"><p className="eyebrow">CONTEÚDOS NÃO REGISTRADOS</p><div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">{untouchedModules.map((module) => <div key={module.id} className="rounded-xl border border-[#e6ded1] bg-[#fffdf8] p-4"><p className="text-[10px] font-bold tracking-wider text-[#0e5a70]">{module.code}</p><p className="font-display mt-1 text-sm font-bold">{module.title}</p><p className="mt-1 text-xs text-[#718087]">{module.discipline}</p></div>)}{!untouchedModules.length && <p className="text-sm text-[#63747b]">Todos os módulos foram marcados como estudados.</p>}</div></section></div>; }
 
-function HistoryArea({ state }: { state: StudyState }) { return <div className="space-y-7"><section className="flex flex-col justify-between gap-4 border-b border-[#d7cfc1] pb-6 sm:flex-row sm:items-end"><div><p className="eyebrow">REGISTRO PERMANENTE</p><h2 className="font-display mt-2 text-3xl font-extrabold">Histórico de simulados</h2><p className="mt-2 text-sm text-[#62727a]">Seus resultados permanecem armazenados neste navegador.</p></div><div className="rounded-xl bg-[#e4efed] px-4 py-3 text-sm font-bold text-[#0e5a70]">{state.simulations.length} simulado{state.simulations.length === 1 ? "" : "s"} registrado{state.simulations.length === 1 ? "" : "s"}</div></section>{state.simulations.length ? <section className="shell-card overflow-hidden"><div className="overflow-x-auto"><table className="w-full min-w-[680px] text-left"><thead className="border-b border-[#e3dccf] bg-[#faf7f0] text-[10px] tracking-[0.15em] text-[#6c7b81]"><tr><th className="px-5 py-4">DATA</th><th className="px-5 py-4">ITENS</th><th className="px-5 py-4">ACERTOS</th><th className="px-5 py-4">APROVEITAMENTO</th><th className="px-5 py-4">TEMPO</th><th className="px-5 py-4">STATUS</th></tr></thead><tbody>{[...state.simulations].reverse().map((sim) => { const score = percentage(sim.correct, sim.total); return <tr key={sim.id} className="border-b border-[#eee8dd] last:border-0"><td className="px-5 py-4 text-sm">{new Date(sim.date).toLocaleDateString("pt-BR")}</td><td className="px-5 py-4 text-sm">{sim.total}</td><td className="px-5 py-4 text-sm font-bold">{sim.correct} / {sim.total}</td><td className="px-5 py-4"><span className="rounded-full bg-[#e4efed] px-2.5 py-1 text-xs font-bold text-[#0e5a70]">{score}%</span></td><td className="px-5 py-4 text-sm">{formatTime(sim.elapsedSeconds)}</td><td className="px-5 py-4"><span className="flex w-fit items-center gap-1 text-xs font-bold text-[#16705e]"><Check className="h-3.5 w-3.5" />Concluído</span></td></tr>; })}</tbody></table></div></section> : <section className="shell-card"><EmptyState icon={History} title="Seu histórico começa no primeiro simulado" text="O resultado, o tempo e o desempenho por bloco serão preservados neste dispositivo." /></section>}</div>; }
+function HistoryArea({ state }: { state: StudyState }) { return <div className="space-y-7"><section className="flex flex-col justify-between gap-4 border-b border-[#d7cfc1] pb-6 sm:flex-row sm:items-end"><div><p className="eyebrow">REGISTRO PERMANENTE</p><h2 className="font-display mt-2 text-3xl font-extrabold">Histórico de simulados</h2><p className="mt-2 text-sm text-[#62727a]">Seus resultados ficam salvos com segurança na sua conta privada.</p></div><div className="rounded-xl bg-[#e4efed] px-4 py-3 text-sm font-bold text-[#0e5a70]">{state.simulations.length} simulado{state.simulations.length === 1 ? "" : "s"} registrado{state.simulations.length === 1 ? "" : "s"}</div></section>{state.simulations.length ? <section className="shell-card overflow-hidden"><div className="overflow-x-auto"><table className="w-full min-w-[680px] text-left"><thead className="border-b border-[#e3dccf] bg-[#faf7f0] text-[10px] tracking-[0.15em] text-[#6c7b81]"><tr><th className="px-5 py-4">DATA</th><th className="px-5 py-4">ITENS</th><th className="px-5 py-4">ACERTOS</th><th className="px-5 py-4">APROVEITAMENTO</th><th className="px-5 py-4">TEMPO</th><th className="px-5 py-4">STATUS</th></tr></thead><tbody>{[...state.simulations].reverse().map((sim) => { const score = percentage(sim.correct, sim.total); return <tr key={sim.id} className="border-b border-[#eee8dd] last:border-0"><td className="px-5 py-4 text-sm">{new Date(sim.date).toLocaleDateString("pt-BR")}</td><td className="px-5 py-4 text-sm">{sim.total}</td><td className="px-5 py-4 text-sm font-bold">{sim.correct} / {sim.total}</td><td className="px-5 py-4"><span className="rounded-full bg-[#e4efed] px-2.5 py-1 text-xs font-bold text-[#0e5a70]">{score}%</span></td><td className="px-5 py-4 text-sm">{formatTime(sim.elapsedSeconds)}</td><td className="px-5 py-4"><span className="flex w-fit items-center gap-1 text-xs font-bold text-[#16705e]"><Check className="h-3.5 w-3.5" />Concluído</span></td></tr>; })}</tbody></table></div></section> : <section className="shell-card"><EmptyState icon={History} title="Seu histórico começa no primeiro simulado" text="O resultado, o tempo e o desempenho por bloco serão preservados na sua conta." /></section>}</div>; }
 
 function EmptyState({ icon: Icon, title, text }: { icon: typeof History; title: string; text: string }) { return <div className="flex min-h-[170px] flex-col items-center justify-center p-6 text-center"><div className="grid h-11 w-11 place-items-center rounded-2xl bg-[#e8f0ee] text-[#0e5a70]"><Icon className="h-5 w-5" /></div><p className="font-display mt-3 text-sm font-bold">{title}</p><p className="mt-1 max-w-sm text-xs leading-5 text-[#748188]">{text}</p></div>; }

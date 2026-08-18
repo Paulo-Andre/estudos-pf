@@ -41,9 +41,22 @@
 
 ## Apostila digital completa
 
-- [ ] Definir o padrão de apostila por módulo: teoria, definições, esquema, exemplos resolvidos, lei seca e prática.
-- [ ] Pesquisar e registrar fontes oficiais e públicas para fundamentar os conteúdos.
-- [ ] Redigir teoria completa para Português, Raciocínio Lógico, Estatística e Informática.
-- [ ] Redigir teoria completa para Direito, Direitos Humanos, Legislação Especial e Contabilidade.
-- [ ] Integrar o formato de apostila à navegação de cada aula sem exigir fontes externas durante o estudo.
-- [ ] Validar conteúdo, fontes e leitura da apostila em desktop e celular.
+- [x] Definir o padrão de apostila por módulo: teoria, definições, esquema, exemplos resolvidos, lei seca e prática.
+- [x] Pesquisar e registrar fontes oficiais e públicas para fundamentar os conteúdos.
+- [x] Redigir teoria completa para Português, Raciocínio Lógico, Estatística e Informática.
+- [x] Redigir teoria completa para Direito, Direitos Humanos, Legislação Especial e Contabilidade.
+- [x] Integrar o formato de apostila à navegação de cada aula sem exigir fontes externas durante o estudo.
+- [x] Validar conteúdo, fontes e leitura da apostila em desktop e celular.
+
+## Plataforma multiusuário, acesso e administração
+
+- [x] Consolidar os requisitos dos anexos e a migração do progresso local para dados privados por usuário.
+- [x] Atualizar o projeto para banco de dados, autenticação de usuários e rotas protegidas.
+- [x] Modelar perfis, progresso, respostas, simulados, notas, métricas, funções e trilha de auditoria.
+- [x] Implementar tela de entrada, cadastro, login, logout, perfil e alteração segura de senha.
+- [x] Persistir o progresso individual de cada estudante e impedir acesso cruzado aos dados no backend.
+- [x] Implementar função ROOT, painel administrativo, busca, bloqueio, redefinição de senha e remoção confirmada de contas.
+- [x] Registrar ações administrativas essenciais com usuário afetado, responsável e data/hora.
+- [x] Integrar as demais mudanças dos anexos, testar permissões e publicar a versão revisada.
+- [x] Executar e registrar a validação automatizada de bloqueio de rotas administrativas e de conteúdo sem sessão local.
+- [ ] Salvar e publicar o checkpoint da versão multiusuário após a validação final.

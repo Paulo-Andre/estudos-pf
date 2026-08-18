@@ -2,10 +2,11 @@
  * Estilo Arquivo Operacional: leitura calma, hierarquia documental e contraste azul-petróleo.
  * A teoria é apresentada como uma apostila de estudo autônomo, sem substituir os desafios ativos.
  */
-import { useState } from "react";
-import { Award, BookOpen, Brain, Check, ExternalLink, Sparkles, X } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Award, BookOpen, Brain, Check, ExternalLink, Loader2, Sparkles, X } from "lucide-react";
 import type { DetailedStudyModule } from "@/data/pfCompleteStudyData";
 import type { ApostilaChapter } from "@/data/pfApostilaData";
+import { trpc } from "@/lib/trpc";
 
 type Props = {
   module: DetailedStudyModule;
@@ -18,7 +19,15 @@ type Props = {
 export function ApostilaModulePanel({ module, chapter, completed, onComplete, onClose }: Props) {
   const [challengeAnswer, setChallengeAnswer] = useState<number | null>(null);
   const [revealRecall, setRevealRecall] = useState(false);
+  const [note, setNote] = useState("");
+  const [noteStatus, setNoteStatus] = useState<"idle" | "saved">("idle");
+  const noteQuery = trpc.study.note.useQuery({ moduleId: module.id });
+  const saveNote = trpc.study.saveNote.useMutation({ onSuccess: () => setNoteStatus("saved") });
   const isCorrect = challengeAnswer === module.lesson.challenge.correct;
+
+  useEffect(() => {
+    if (noteQuery.data?.content !== undefined) setNote(noteQuery.data.content);
+  }, [noteQuery.data?.content]);
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-[#152d38]/55 p-3 backdrop-blur-sm">
@@ -110,6 +119,12 @@ export function ApostilaModulePanel({ module, chapter, completed, onComplete, on
               <p className="mt-2 text-sm leading-6 text-[#41635f]">{chapter.fonteOficial.nota}</p>
             </section>
           )}
+
+          <section className="rounded-2xl border border-[#c9dbd6] bg-[#f6fbfa] p-5">
+            <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="eyebrow text-[#19705d]">ANOTAÇÃO PRIVADA</p><h3 className="font-display mt-1 text-lg font-bold text-[#173d4a]">Registre o que precisa recuperar.</h3></div><span className="text-[10px] font-bold tracking-wide text-[#5a7778]">SOMENTE SUA CONTA</span></div>
+            <textarea value={note} onChange={event => { setNote(event.target.value); setNoteStatus("idle"); }} maxLength={12000} placeholder="Ex.: revisar exceção, criar exemplo próprio, retomar lei seca..." className="mt-4 min-h-28 w-full rounded-xl border border-[#ccd8d4] bg-white p-3 text-sm leading-6 text-[#314f58] outline-none transition focus:border-[#0e5a70] focus:ring-2 focus:ring-[#0e5a70]/15" />
+            <div className="mt-3 flex items-center justify-between gap-3"><p className="text-[11px] text-[#61767b]">{noteStatus === "saved" ? "Anotação salva no seu dossiê." : "A anotação fica associada a esta aula."}</p><button type="button" onClick={() => saveNote.mutate({ moduleId: module.id, content: note })} disabled={saveNote.isPending} className="ghost-button border-[#97c5bb] text-[#0e5a70] disabled:opacity-60">{saveNote.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}{saveNote.isPending ? "Salvando" : "Salvar anotação"}</button></div>
+          </section>
 
           <section className="rounded-2xl border border-[#c8ddd7] bg-[#f7fcfa] p-5">
             <div className="flex items-center gap-2"><Brain className="h-5 w-5 text-[#0e5a70]" /><div><p className="eyebrow">DESAFIO DE 30 SEGUNDOS</p><h3 className="font-display mt-1 text-lg font-bold text-[#173d4a]">Teste a compreensão antes de avançar.</h3></div></div>
