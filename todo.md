@@ -59,4 +59,16 @@
 - [x] Registrar ações administrativas essenciais com usuário afetado, responsável e data/hora.
 - [x] Integrar as demais mudanças dos anexos, testar permissões e publicar a versão revisada.
 - [x] Executar e registrar a validação automatizada de bloqueio de rotas administrativas e de conteúdo sem sessão local.
-- [ ] Salvar e publicar o checkpoint da versão multiusuário após a validação final.
+- [x] Salvar e publicar o checkpoint da versão multiusuário após a validação final.
+
+## Auditoria de cobertura e vídeos complementares
+
+- [x] Comparar cada disciplina e subitem do edital oficial de Agente PF 2025 com os módulos e tópicos exibidos na plataforma.
+- [x] Publicar uma matriz de cobertura que evidencie itens completos, agrupamentos pedagógicos e lacunas encontradas.
+- [x] Desdobrar ou ampliar módulos que não ofereçam granularidade suficiente para estudo autônomo.
+- [x] Pesquisar vídeos em português por tema e selecionar somente materiais de canais confiáveis, aderentes ao tópico e com boa aceitação pública verificável.
+- [x] Inserir os vídeos selecionados como complemento opcional dentro das respectivas aulas, sem substituir a teoria da apostila.
+- [ ] Validar links, cobertura atualizada, compilação, leitura em celular e publicação da revisão.
+- [x] Sincronizar o catálogo integrado de vídeos com a curadoria final documentada por disciplina.
+- [x] Conferir que os links integrados no catálogo correspondem aos links registrados na curadoria final.
+- [ ] Validar visualmente, em uma sessão já autenticada, a leitura móvel de uma apostila e sua seção de vídeo complementar sem criar contas de teste persistentes.

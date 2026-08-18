@@ -3,9 +3,10 @@
  * A teoria é apresentada como uma apostila de estudo autônomo, sem substituir os desafios ativos.
  */
 import { useEffect, useState } from "react";
-import { Award, BookOpen, Brain, Check, ExternalLink, Loader2, Sparkles, X } from "lucide-react";
+import { Award, BookOpen, Brain, Check, ExternalLink, Loader2, PlayCircle, Sparkles, X } from "lucide-react";
 import type { DetailedStudyModule } from "@/data/pfCompleteStudyData";
 import type { ApostilaChapter } from "@/data/pfApostilaData";
+import { curatedVideoForModule } from "@/data/pfCuratedVideos";
 import { trpc } from "@/lib/trpc";
 
 type Props = {
@@ -24,6 +25,7 @@ export function ApostilaModulePanel({ module, chapter, completed, onComplete, on
   const noteQuery = trpc.study.note.useQuery({ moduleId: module.id });
   const saveNote = trpc.study.saveNote.useMutation({ onSuccess: () => setNoteStatus("saved") });
   const isCorrect = challengeAnswer === module.lesson.challenge.correct;
+  const video = curatedVideoForModule(module.id);
 
   useEffect(() => {
     if (noteQuery.data?.content !== undefined) setNote(noteQuery.data.content);
@@ -117,6 +119,23 @@ export function ApostilaModulePanel({ module, chapter, completed, onComplete, on
                 {chapter.fonteOficial.rotulo}<ExternalLink className="h-4 w-4" />
               </a>
               <p className="mt-2 text-sm leading-6 text-[#41635f]">{chapter.fonteOficial.nota}</p>
+            </section>
+          )}
+
+          {video && (
+            <section className="rounded-2xl border border-[#c8d9e4] bg-[#f4f9fd] p-5">
+              <div className="flex items-start gap-3">
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#dcecf6] text-[#0e5a70]"><PlayCircle className="h-5 w-5" /></span>
+                <div>
+                  <p className="eyebrow text-[#245c70]">VÍDEO COMPLEMENTAR · OPCIONAL</p>
+                  <a href={video.url} target="_blank" rel="noreferrer" className="mt-1 inline-flex items-center gap-2 font-display text-base font-bold text-[#0e5a70] underline decoration-[#a8cadb] underline-offset-4 hover:text-[#174a5a]">
+                    {video.title}<ExternalLink className="h-4 w-4" />
+                  </a>
+                  <p className="mt-2 text-xs font-bold text-[#416a7c]">{video.channel}</p>
+                  <p className="mt-2 text-sm leading-6 text-[#426373]">{video.note}</p>
+                  <p className="mt-3 text-[11px] leading-5 text-[#627b88]">A apostila continua sendo o material principal. O vídeo foi selecionado por aderência, identificação do canal/docente e sinais públicos de aceitação; disponibilidade e atualidade devem ser conferidas no YouTube.</p>
+                </div>
+              </div>
             </section>
           )}
 
