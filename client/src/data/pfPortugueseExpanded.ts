@@ -9,7 +9,7 @@ export type PortugueseExpandedModule = StudyModule & {
   lesson: InteractiveLesson;
 };
 
-const source = "Edital PF 2025, Anexo II — Cargo 16: Agente de Polícia Federal.";
+const source = "Apostilas autorizadas do curso 221783 — aulas 00, 01, 02, 03, 05, 06, 08, 09, 10, 12, 14 e 15 — reorganizadas em redação autoral; conferência pelo Edital PF 2025, Anexo II — Cargo 16: Agente de Polícia Federal.";
 
 function aula(
   id: string,

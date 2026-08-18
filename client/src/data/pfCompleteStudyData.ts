@@ -85,7 +85,7 @@ const baseStudyModules: DetailedStudyModule[] = [
 
 export const completeStudyModules: DetailedStudyModule[] = [
   ...portugueseExpandedModules,
-  ...baseStudyModules.filter((item) => item.discipline !== "Língua Portuguesa"),
+  ...baseStudyModules.filter((item) => item.discipline !== "Língua Portuguesa" && item.discipline !== "Legislação Especial"),
 ];
 
 export const completeCoverage = {
