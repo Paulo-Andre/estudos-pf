@@ -22,3 +22,11 @@
 - [x] Reestruturar o painel da lição para exibir explicações desenvolvidas, mapas comparativos e exemplos resolvidos.
 - [x] Replicar o novo formato aprofundado às aulas dos demais conteúdos do edital.
 - [x] Validar o novo formato de aula em desktop e celular.
+
+## Língua Portuguesa — trilha desdobrada
+
+- [x] Conferir todos os subitens de Língua Portuguesa do edital PF 2025.
+- [x] Separar os cinco dossiês gerais em aulas específicas por assunto gramatical, textual e de redação oficial.
+- [x] Desenvolver conteúdo estudável, exemplos e práticas em cada aula unitária de Português.
+- [x] Integrar o novo percurso de Português à página de estudo e preservar o progresso existente.
+- [x] Validar a matriz completa, a compilação e a leitura em telas desktop e móvel.
