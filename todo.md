@@ -30,3 +30,11 @@
 - [x] Desenvolver conteúdo estudável, exemplos e práticas em cada aula unitária de Português.
 - [x] Integrar o novo percurso de Português à página de estudo e preservar o progresso existente.
 - [x] Validar a matriz completa, a compilação e a leitura em telas desktop e móvel.
+
+## Demais disciplinas — conteúdo completo
+
+- [x] Auditar os módulos de Informática, Raciocínio Lógico e Estatística que ainda exigem explicações desenvolvidas.
+- [x] Criar aulas completas de Informática, Raciocínio Lógico e Estatística com exemplos, resolução guiada e revisão ativa.
+- [x] Criar aulas completas de Direito Administrativo, Constitucional, Penal, Processual Penal, Direitos Humanos e Legislação Especial.
+- [x] Criar aulas completas de Contabilidade com aplicações, exemplos e desafios.
+- [x] Integrar a biblioteca ampliada, validar a cobertura por disciplina e revisar em desktop e celular.
