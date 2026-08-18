@@ -38,3 +38,12 @@
 - [x] Criar aulas completas de Direito Administrativo, Constitucional, Penal, Processual Penal, Direitos Humanos e Legislação Especial.
 - [x] Criar aulas completas de Contabilidade com aplicações, exemplos e desafios.
 - [x] Integrar a biblioteca ampliada, validar a cobertura por disciplina e revisar em desktop e celular.
+
+## Apostila digital completa
+
+- [ ] Definir o padrão de apostila por módulo: teoria, definições, esquema, exemplos resolvidos, lei seca e prática.
+- [ ] Pesquisar e registrar fontes oficiais e públicas para fundamentar os conteúdos.
+- [ ] Redigir teoria completa para Português, Raciocínio Lógico, Estatística e Informática.
+- [ ] Redigir teoria completa para Direito, Direitos Humanos, Legislação Especial e Contabilidade.
+- [ ] Integrar o formato de apostila à navegação de cada aula sem exigir fontes externas durante o estudo.
+- [ ] Validar conteúdo, fontes e leitura da apostila em desktop e celular.

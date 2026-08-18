@@ -72,3 +72,7 @@ O símbolo é um **monograma abstrato em forma de escudo aberto**, construído c
 - Em telas grandes, a faixa lateral operacional permanece visível e carrega marca, áreas principais, missão e progresso; o painel principal não substitui essa orientação.
 - Cartões devem ler como registros de dossiê: filetes, etiquetas, códigos e hierarquia documental têm precedência sobre sombras macias e formas excessivamente arredondadas.
 - O monograma de escudo aberto e o wordmark **ESTUDOS PF** devem aparecer no primeiro nível visual de toda tela principal.
+- Painéis e cartões devem se comportar como folhas de dossiê: superfícies mais planas, bordas discretas, códigos e carimbos têm prioridade sobre sombras e bolhas decorativas.
+- A faixa lateral operacional deve exibir um eixo de avanço com marcos, código de treinamento e um selo de XP visualmente dominante, reforçando a noção de prontuário de preparo.
+- Imagens de destaque devem remeter a evidências de estudo — edital, anotações, marcações e instrumentos de análise — e não a fotografia motivacional genérica.
+- Números, códigos de módulo e microetiquetas usam contraste tipográfico forte; ícones arredondados são auxiliares e jamais sustentam a hierarquia principal.
