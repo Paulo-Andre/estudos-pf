@@ -14,3 +14,11 @@
 - [x] Criar desafios de aprendizagem com feedback imediato e explicação didática por lição.
 - [x] Converter Direito Administrativo, Constitucional, Penal/Processual, Direitos Humanos, Legislação Especial e Contabilidade em aulas completas.
 - [x] Validar que a experiência permita estudar o conteúdo diretamente no site, em desktop e celular.
+
+## Aulas aprofundadas
+
+- [x] Definir blocos didáticos de conteúdo: conceito, explicação, exemplo, leitura comentada e prática resolvida.
+- [x] Transformar a lição de Leitura, tipos e gêneros em uma aula completa que possa ser estudada sem material externo.
+- [x] Reestruturar o painel da lição para exibir explicações desenvolvidas, mapas comparativos e exemplos resolvidos.
+- [x] Replicar o novo formato aprofundado às aulas dos demais conteúdos do edital.
+- [x] Validar o novo formato de aula em desktop e celular.
