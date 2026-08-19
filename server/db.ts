@@ -163,6 +163,20 @@ export async function updateUserPassword(userId: number, passwordHash: string) {
   await db.update(users).set({ passwordHash }).where(eq(users.id, userId));
 }
 
+/** Converte a identidade proprietária existente para a conta local ROOT, preservando o userId e o histórico. */
+export async function convertUserToLocalRoot(userId: number, passwordHash: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Banco de dados indisponível");
+  await db.update(users).set({
+    openId: "local:paulo",
+    name: "Paulo André",
+    username: "paulo",
+    passwordHash,
+    loginMethod: "local",
+    role: "admin",
+  }).where(eq(users.id, userId));
+}
+
 export async function updateUserProfile(userId: number, input: { name: string; username: string; email: string }) {
   const db = await getDb();
   if (!db) throw new Error("Banco de dados indisponível");
