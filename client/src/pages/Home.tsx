@@ -63,11 +63,7 @@ function getDisciplinePerformance(state: StudyState) {
 }
 
 export default function Home() {
-  // The useAuth hook provides authentication state.
-  // To implement login/logout, call logout(), or start login from an event
-  // handler: onClick={() => startLogin()} (imported from "@/const"). Never call
-  // startLogin() during render (no href={startLogin()}) — it mints a one-time
-  // nonce cookie and must run only at the moment of navigation.
+  // The useAuth hook reads the local session created by the cadastro/login screen.
   const { user, loading, isAuthenticated, logout } = useAuth();
 
   if (loading) return <div className="grid min-h-screen place-items-center bg-[#152d38] text-sm font-bold text-[#e8e4d9]">Carregando credencial...</div>;
