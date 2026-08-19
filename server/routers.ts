@@ -3,7 +3,7 @@ import { z } from "zod";
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
-import { adminProcedure, protectedProcedure, publicProcedure, router } from "./_core/trpc";
+import { adminProcedure, enrollmentRequiredProcedure, protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import {
   completeStudyModule,
   createLocalUser,
@@ -115,18 +115,18 @@ export const appRouter = router({
     }),
   }),
   study: router({
-    state: protectedProcedure.query(({ ctx }) => getStudyState(ctx.user.id)),
+    state: enrollmentRequiredProcedure.query(({ ctx }) => getStudyState(ctx.user.id)),
     access: protectedProcedure.query(({ ctx }) => getUserCourseAccess(ctx.user.id)),
-    answer: protectedProcedure.input(z.object({ questionId: z.string().trim().min(1).max(80), correct: z.boolean() })).mutation(({ input, ctx }) => recordAnswer(ctx.user.id, input.questionId, input.correct)),
-    completeModule: protectedProcedure.input(z.object({ moduleId: z.string().trim().min(1).max(80) })).mutation(({ input, ctx }) => completeStudyModule(ctx.user.id, input.moduleId)),
-    submitSimulation: protectedProcedure.input(z.object({
+    answer: enrollmentRequiredProcedure.input(z.object({ questionId: z.string().trim().min(1).max(80), correct: z.boolean() })).mutation(({ input, ctx }) => recordAnswer(ctx.user.id, input.questionId, input.correct)),
+    completeModule: enrollmentRequiredProcedure.input(z.object({ moduleId: z.string().trim().min(1).max(80) })).mutation(({ input, ctx }) => completeStudyModule(ctx.user.id, input.moduleId)),
+    submitSimulation: enrollmentRequiredProcedure.input(z.object({
       id: z.string().min(1).max(64), total: z.number().int().positive(), correct: z.number().int().nonnegative(), errors: z.number().int().nonnegative(), elapsedSeconds: z.number().int().nonnegative(),
       byDiscipline: metricSchema, byBlock: metricSchema,
       answers: z.array(z.object({ questionId: z.string().min(1).max(80), correct: z.boolean() })),
       questionIds: z.array(z.string().min(1).max(80)),
     })).mutation(({ input, ctx }) => recordSimulation(ctx.user.id, input)),
-    note: protectedProcedure.input(z.object({ moduleId: z.string().trim().min(1).max(80) })).query(({ input, ctx }) => import("./db").then(({ getNote }) => getNote(ctx.user.id, input.moduleId))),
-    saveNote: protectedProcedure.input(z.object({ moduleId: z.string().trim().min(1).max(80), content: z.string().trim().max(12000) })).mutation(({ input, ctx }) => saveNote(ctx.user.id, input.moduleId, input.content)),
+    note: enrollmentRequiredProcedure.input(z.object({ moduleId: z.string().trim().min(1).max(80) })).query(({ input, ctx }) => import("./db").then(({ getNote }) => getNote(ctx.user.id, input.moduleId))),
+    saveNote: enrollmentRequiredProcedure.input(z.object({ moduleId: z.string().trim().min(1).max(80), content: z.string().trim().max(12000) })).mutation(({ input, ctx }) => saveNote(ctx.user.id, input.moduleId, input.content)),
   }),
   admin: router({
     users: adminProcedure.input(z.object({ search: z.string().trim().max(80).optional() })).query(({ input }) => listManagedUsers(input.search)),
