@@ -30,7 +30,7 @@ export default function AccessGate({ onAuthenticated }: AccessGateProps) {
   return <main className="min-h-screen bg-[#f5f1e8] px-4 py-8 text-[#152d38] sm:grid sm:place-items-center">
     <section className="grid w-full max-w-5xl overflow-hidden border border-[#cfc8b8] bg-[#fffdf7] shadow-[0_22px_70px_rgba(21,45,56,0.16)] md:grid-cols-[0.92fr_1.08fr]">
       <div className="bg-[#152d38] p-8 text-[#fffdf7] sm:p-12">
-        <div className="mb-16 flex items-center gap-3"><div className="grid h-11 w-11 place-items-center rounded-xl bg-[#e8e4d9] text-[#0e5a70]"><ShieldCheck className="h-6 w-6" /></div><div><p className="font-display text-lg font-extrabold">ESTUDOS <span className="text-[#82cfbf]">PF</span></p><p className="text-[9px] font-bold tracking-[0.22em] text-[#8fa7ae]">ARQUIVO OPERACIONAL</p></div></div>
+        <div className="mb-16 flex items-center gap-3"><div className="grid h-11 w-11 place-items-center rounded-xl bg-[#e8e4d9] text-[#0e5a70]"><ShieldCheck className="h-6 w-6" /></div><div><p className="font-display text-lg font-extrabold">MISSÃO<span className="text-[#82cfbf]">VANGUARDA</span></p><p className="text-[9px] font-bold tracking-[0.22em] text-[#8fa7ae]">ARQUIVO OPERACIONAL</p></div></div>
         <p className="text-[10px] font-bold tracking-[0.2em] text-[#8ad2c3]">ACESSO INDIVIDUAL · PRIVADO</p>
         <h1 className="font-display mt-4 text-4xl font-extrabold leading-[1.04] sm:text-5xl">Seu preparo fica sob sua própria guarda.</h1>
         <p className="mt-6 max-w-sm text-sm leading-7 text-[#c7d8d8]">Entre para registrar seu progresso, suas respostas, simulados, notas e evolução. Seus dados de estudo não são compartilhados com outros candidatos.</p>
