@@ -5,7 +5,7 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import {
-  Award, BarChart3, BookOpen, Brain, CalendarClock, Check, ChevronRight, CircleHelp, Clock3, CreditCard, Flame, Gauge,
+  Award, BarChart3, BookOpen, Bookmark, Brain, CalendarClock, Check, ChevronRight, CircleHelp, Clock3, CreditCard, Flame, Gauge,
   GraduationCap, History, LayoutDashboard, Menu, MessageSquareText, Play, RotateCcw, ShieldCheck, Trash2,
   Sparkles, Target, Trophy, X, Zap,
 } from "lucide-react";
@@ -135,6 +135,7 @@ function StudyWorkspace({ user, logout, initialView, initialCommercePlanId, onCo
   const [rootManagementSection, setRootManagementSection] = useState<RootManagementSection>("business");
   const [sessionReplacementNotice, setSessionReplacementNotice] = useState(() => window.sessionStorage.getItem("nucleo-session-replaced-notice") === "1");
   const platformSettingsQuery = trpc.platform.settings.useQuery(undefined, { refetchOnWindowFocus: false });
+  const uiPreferencesQuery = trpc.auth.preferences.useQuery(undefined, { refetchOnWindowFocus: false });
   const brand = {
     logoUrl: platformSettingsQuery.data?.logoUrl ?? null,
     brandName: platformSettingsQuery.data?.brandName ?? "Núcleo Concursos",
@@ -209,6 +210,7 @@ function StudyWorkspace({ user, logout, initialView, initialCommercePlanId, onCo
   }, [sessionReplacementNotice]);
 
   const privateState = trpc.study.state.useQuery(undefined, { enabled: hasConfirmedCourseAccess, refetchOnWindowFocus: false });
+  const bookmarksQuery = trpc.study.bookmarks.useQuery(undefined, { enabled: hasConfirmedCourseAccess, refetchOnWindowFocus: false });
   const centralQuestionsQuery = (trpc.study.questions.list as any).useQuery({ courseId: effectiveContestId }, { enabled: canUseActiveCourse, refetchOnWindowFocus: false });
   const dailyCheckQuery = trpc.study.dailyCheck.useQuery({ courseId: effectiveContestId }, { enabled: user.role !== "admin" && permittedContestIds.includes(effectiveContestId), refetchOnWindowFocus: false });
   const personalReviewsQuery = trpc.study.review.list.useQuery(undefined, { enabled: hasConfirmedCourseAccess && !tutorialCourse, refetchOnWindowFocus: false });
@@ -216,6 +218,8 @@ function StudyWorkspace({ user, logout, initialView, initialCommercePlanId, onCo
   const roadmapQuery = trpc.study.roadmap.list.useQuery({ courseId: effectiveContestId }, { enabled: canUseActiveCourse, refetchOnWindowFocus: false });
   const personalCompetitionScoreQuery = trpc.competition.myScore.useQuery({}, { enabled: canUseActiveCourse && !tutorialCourse, refetchOnWindowFocus: false });
   const answerMutation = trpc.study.answer.useMutation();
+  const addBookmarkMutation = trpc.study.bookmarks.add.useMutation({ onSuccess: () => void bookmarksQuery.refetch() });
+  const removeBookmarkMutation = trpc.study.bookmarks.remove.useMutation({ onSuccess: () => void bookmarksQuery.refetch() });
   const moduleMutation = trpc.study.completeModule.useMutation();
   const openContentMutation = trpc.study.contentProgress.open.useMutation({ onSuccess: () => void contentProgressQuery.refetch() });
   const completeContentMutation = trpc.study.contentProgress.complete.useMutation({ onSuccess: () => void contentProgressQuery.refetch() });
@@ -230,6 +234,13 @@ function StudyWorkspace({ user, logout, initialView, initialCommercePlanId, onCo
   useEffect(() => {
     if (privateState.data) setState(privateState.data as StudyState);
   }, [privateState.data]);
+
+  useEffect(() => {
+    const prefs=uiPreferencesQuery.data;
+    if (!prefs) return;
+    document.documentElement.dataset.reducedMotion=prefs.reducedMotion ? "true" : "false";
+    document.documentElement.dataset.compactMode=prefs.compactMode ? "true" : "false";
+  }, [uiPreferencesQuery.data]);
 
   const level = levelFromXp(state.xp);
   const totalAnswers = state.answers.length;
@@ -420,6 +431,11 @@ function StudyWorkspace({ user, logout, initialView, initialCommercePlanId, onCo
       </main>
           {view === "Painel" && !simulation && !simulationResult && quickQuestion && (manualQuickQuestion !== null || !dailyCheckQuery.data?.dismissed) && <QuickCheck question={quickQuestion} answer={quickAnswer} correct={quickCorrect} reviewSaved={((personalReviewsQuery.data ?? []) as PersonalReviewItem[]).some(item => item.questionKey === quickQuestion.id)} reviewPending={addPersonalReviewMutation.isPending} onSaveForReview={() => addToPersonalReview(quickQuestion)} onAnswer={(answer) => { setQuickAnswer(answer); registerAnswer(quickQuestion, answer === quickQuestion.answer); }} onDismiss={() => manualQuickQuestion ? setManualQuickQuestion(null) : dismissDailyCheckMutation.mutate({ courseId: effectiveContestId })} />}
       {openedModule && <ModulePanel module={openedModule} body={contentByModuleId.get(openedModule.id)?.body ?? null} completed={state.completedModules.includes(openedModule.id)} onComplete={() => completeModule(openedModule)} onClose={() => setOpenedModule(null)} />}
+      {openedModule && contentByModuleId.get(openedModule.id) && (() => {
+        const content=contentByModuleId.get(openedModule.id)!;
+        const saved=(bookmarksQuery.data ?? []).find((item:any)=>item.contentId===content.id && item.courseId===effectiveContestId);
+        return <button type="button" disabled={addBookmarkMutation.isPending||removeBookmarkMutation.isPending} onClick={() => saved ? removeBookmarkMutation.mutate({id:saved.id}) : addBookmarkMutation.mutate({courseId:effectiveContestId,contentId:content.id})} className="fixed bottom-[max(1rem,env(safe-area-inset-bottom))] left-[max(1rem,env(safe-area-inset-left))] z-[70] inline-flex min-h-11 items-center gap-2 rounded-xl border border-[#9bc8bc] bg-[#fffdf8] px-4 py-2 text-xs font-bold text-[#0e5a70] shadow-xl disabled:opacity-60"><Bookmark className={`h-4 w-4 ${saved ? "fill-current" : ""}`}/>{saved ? "Salva nos favoritos" : "Salvar aula"}</button>;
+      })()}
       {accountOpen && <AccountPanel user={user} onClose={() => setAccountOpen(false)} />}
       {commerceOpen && <CommercePanel initialPlanId={commercePlanFocus} onClose={() => { setCommerceOpen(false); setCommercePlanFocus(null); }} />}
       {rootManagementOpen && user.role === "admin" && <RootManagementPanel activeSection={rootManagementSection} onSectionChange={setRootManagementSection} onClose={() => setRootManagementOpen(false)} />}
