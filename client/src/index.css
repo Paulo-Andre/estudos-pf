@@ -179,3 +179,19 @@ html[data-compact-mode="true"] .shell-card {
 @media (max-width: 1023px) {
   .workspace-content { padding-bottom: calc(6.75rem + env(safe-area-inset-bottom)); }
 }
+
+.account-panel > div > section {
+  border-color: #dfe9e5 !important;
+}
+.account-panel > div > section:not(:first-child) {
+  border-top-color: #dfe9e5 !important;
+}
+.account-panel input,
+.account-panel select,
+.account-panel textarea {
+  border-radius: .75rem;
+  border-color: #cfddd8;
+}
+@media (max-width: 639px) {
+  .account-panel { border-radius: 1.25rem; }
+}
