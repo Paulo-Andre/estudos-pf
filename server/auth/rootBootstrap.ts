@@ -2,6 +2,8 @@ import { ENV } from "../_core/env";
 import {
   convertUserToLocalRoot,
   createLocalUser,
+  ensureDefaultCourses,
+  ensureDefaultKnowledgeBase,
   getUserByOpenId,
   getUserByUsername,
   updateUserRole,
@@ -22,6 +24,8 @@ export async function ensureRootAccount() {
     if (existingLocal.loginMethod !== "local" || existingLocal.openId !== "local:paulo" || !existingLocal.passwordHash) {
       await convertUserToLocalRoot(existingLocal.id, await hashPassword(ENV.rootInitialPassword));
     }
+    await ensureDefaultCourses(existingLocal.id);
+    await ensureDefaultKnowledgeBase(existingLocal.id);
     return;
   }
 
@@ -32,16 +36,20 @@ export async function ensureRootAccount() {
     const existingOwner = await getUserByOpenId(ownerOpenId);
     if (existingOwner) {
       await convertUserToLocalRoot(existingOwner.id, await hashPassword(ENV.rootInitialPassword));
+      await ensureDefaultCourses(existingOwner.id);
+      await ensureDefaultKnowledgeBase(existingOwner.id);
       return;
     }
   }
 
   const passwordHash = await hashPassword(ENV.rootInitialPassword);
-  await createLocalUser({
+  const root = await createLocalUser({
     name: "Paulo André",
     username: "paulo",
     email: null,
     passwordHash,
     role: "admin",
   });
+  await ensureDefaultCourses(root.id);
+  await ensureDefaultKnowledgeBase(root.id);
 }
