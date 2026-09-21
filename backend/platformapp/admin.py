@@ -1,0 +1,4 @@
+from django.contrib import admin
+from .models import CompetitionAnswer,CompetitionMonthlyGoal,CompetitionRound,CompetitionSettings,GlobalContactSettings,PlatformAlert,PlatformAlertDismissal,PlatformGeneralSettings
+for model in [PlatformAlert,PlatformAlertDismissal,GlobalContactSettings,PlatformGeneralSettings,CompetitionSettings,CompetitionMonthlyGoal,CompetitionRound,CompetitionAnswer]:
+    admin.site.register(model)

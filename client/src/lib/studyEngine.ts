@@ -1,5 +1,5 @@
 /* Estudos PF — lógica de progresso: recompensa domínio demonstrado e preserva histórico local. */
-import { Block, StudyQuestion, blocks } from "@/data/pfStudyData";
+import { blocks, type Block, type StudyQuestion } from "@/types/study";
 
 export type AnswerRecord = { questionId: string; correct: boolean; answeredAt: string };
 export type SimulationRecord = {
@@ -21,9 +21,11 @@ export type StudyState = {
   lastStudyDate?: string;
   studyDates: string[];
   usedQuestionIds: string[];
+  /** Acertos de simulados desde o último ciclo semanal de Brasília. */
+  weeklySimulationCorrect: number;
 };
 
-export const emptyState: StudyState = { completedModules: [], answers: [], simulations: [], xp: 0, studyDates: [], usedQuestionIds: [] };
+export const emptyState: StudyState = { completedModules: [], answers: [], simulations: [], xp: 0, studyDates: [], usedQuestionIds: [], weeklySimulationCorrect: 0 };
 export const storageKey = "estudos-pf-operational-state-v1";
 
 export function loadState(): StudyState {
@@ -59,15 +61,69 @@ export function currentStreak(studyDates: string[]) {
   return streak;
 }
 
-export function selectSimulationQuestions(bank: StudyQuestion[], total: number, usedIds: string[]) {
-  const selected: StudyQuestion[] = [];
+function shuffleQuestions<T>(items: T[]) {
+  const copy = [...items];
+  for (let index = copy.length - 1; index > 0; index -= 1) {
+    const target = Math.floor(Math.random() * (index + 1));
+    [copy[index], copy[target]] = [copy[target]!, copy[index]!];
+  }
+  return copy;
+}
+
+/**
+ * Seleciona questões de Certo/Errado alternando os dois gabaritos sempre que
+ * houver oferta. Itens inéditos continuam prioritários dentro de cada lado.
+ */
+export function selectBalancedBooleanQuestions<T extends { id: string; answer: boolean }>(bank: T[], total: number, usedIds: string[]) {
+  const unique = Array.from(new Map(bank.map(question => [question.id, question])).values());
+  const buckets = new Map<boolean, { fresh: T[]; known: T[] }>([
+    [true, { fresh: [], known: [] }],
+    [false, { fresh: [], known: [] }],
+  ]);
+
+  unique.forEach(question => {
+    const bucket = buckets.get(question.answer)!;
+    if (usedIds.includes(question.id)) bucket.known.push(question);
+    else bucket.fresh.push(question);
+  });
+
+  const orderedAnswers = Math.random() < 0.5 ? [true, false] : [false, true];
+  orderedAnswers.forEach(answer => {
+    const bucket = buckets.get(answer)!;
+    bucket.fresh = shuffleQuestions(bucket.fresh);
+    bucket.known = shuffleQuestions(bucket.known);
+  });
+
+  const selected: T[] = [];
+  while (selected.length < total) {
+    let found = false;
+    orderedAnswers.forEach(answer => {
+      if (selected.length >= total) return;
+      const bucket = buckets.get(answer)!;
+      const next = bucket.fresh.pop() ?? bucket.known.pop();
+      if (!next) return;
+      selected.push(next);
+      found = true;
+    });
+    if (!found) break;
+  }
+  return selected;
+}
+
+export function selectSimulationQuestions<T extends StudyQuestion>(bank: T[], total: number, usedIds: string[]) {
+  const selected: T[] = [];
   blocks.forEach((block, index) => {
     const target = index === blocks.length - 1 ? total - selected.length : Math.round(total * block.ratio);
     const pool = bank.filter((question) => question.block === block.id);
-    const fresh = pool.filter((question) => !usedIds.includes(question.id)).sort(() => Math.random() - 0.5);
-    const known = pool.filter((question) => usedIds.includes(question.id)).sort(() => Math.random() - 0.5);
-    const arranged = [...fresh, ...known];
-    for (let i = 0; i < target; i += 1) selected.push(arranged[i % arranged.length]);
+    selected.push(...selectBalancedBooleanQuestions(pool, target, usedIds));
   });
-  return selected.sort(() => Math.random() - 0.5);
+  return Array.from(new Map(selected.map(question => [question.id, question])).values());
+}
+
+/** Seleção sem proporção de blocos para fontes reutilizáveis que ainda não possuem classificação de edital. */
+export function selectUniqueQuestions<T extends { id: string }>(bank: T[], total: number, usedIds: string[]) {
+  const unique = Array.from(new Map(bank.map(question => [question.id, question])).values());
+  const fresh = unique.filter(question => !usedIds.includes(question.id)).sort(() => Math.random() - 0.5);
+  const known = unique.filter(question => usedIds.includes(question.id)).sort(() => Math.random() - 0.5);
+  return [...fresh, ...known].slice(0, Math.max(0, total));
 }

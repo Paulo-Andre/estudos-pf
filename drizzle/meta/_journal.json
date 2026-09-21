@@ -15,6 +15,202 @@
       "when": 1787085485252,
       "tag": "0001_panoramic_frightful_four",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1787106775769,
+      "tag": "0002_wise_landau",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1787137571845,
+      "tag": "0003_futuristic_gorgon",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "5",
+      "when": 1787138307208,
+      "tag": "0004_ambiguous_ravenous",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1787153716883,
+      "tag": "0005_deep_obadiah_stane",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1787167424483,
+      "tag": "0006_lowly_demogoblin",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "5",
+      "when": 1787173597132,
+      "tag": "0007_sturdy_brood",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "5",
+      "when": 1787181160673,
+      "tag": "0008_shallow_thor",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "5",
+      "when": 1787186586064,
+      "tag": "0009_marvelous_gwen_stacy",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "5",
+      "when": 1787231082274,
+      "tag": "0010_gifted_reavers",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "5",
+      "when": 1787233373807,
+      "tag": "0011_heavy_wallflower",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "5",
+      "when": 1787233492984,
+      "tag": "0012_giant_mister_fear",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "5",
+      "when": 1787233990016,
+      "tag": "0013_unusual_lady_mastermind",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "5",
+      "when": 1787234065255,
+      "tag": "0014_square_power_man",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "5",
+      "when": 1787235461563,
+      "tag": "0015_solid_triton",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "5",
+      "when": 1787243507711,
+      "tag": "0016_bizarre_sleeper",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "5",
+      "when": 1787252263461,
+      "tag": "0017_numerous_magdalene",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "5",
+      "when": 1787308793485,
+      "tag": "0018_gigantic_jasper_sitwell",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "5",
+      "when": 1787309551652,
+      "tag": "0019_naive_galactus",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "5",
+      "when": 1787311154818,
+      "tag": "0020_hesitant_azazel",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "5",
+      "when": 1787317417189,
+      "tag": "0021_short_iron_fist",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "5",
+      "when": 1787319535959,
+      "tag": "0022_ancient_the_initiative",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "5",
+      "when": 1787319817684,
+      "tag": "0023_crazy_chimera",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "5",
+      "when": 1787328909021,
+      "tag": "0024_freezing_the_leader",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "5",
+      "when": 1787340149516,
+      "tag": "0025_gray_enchantress",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "5",
+      "when": 1787343613589,
+      "tag": "0026_cute_scream",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "5",
+      "when": 1787345878655,
+      "tag": "0027_bizarre_alice",
+      "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "5",
+      "when": 1787345955947,
+      "tag": "0028_noisy_scourge",
+      "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "5",
+      "when": 1787350411132,
+      "tag": "0029_gigantic_moira_mactaggert",
+      "breakpoints": true
     }
   ]
 }

@@ -1,0 +1,1 @@
+ALTER TABLE `platformAlerts` ADD `title` varchar(180) DEFAULT 'Comunicado da plataforma' NOT NULL;

@@ -1,0 +1,1 @@
+ALTER TABLE `simulationQuestions` ADD `snapshotJson` text NOT NULL;

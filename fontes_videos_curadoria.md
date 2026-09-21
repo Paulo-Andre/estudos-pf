@@ -4,6 +4,16 @@
 
 Os vídeos serão oferecidos como **complemento opcional** à apostila. A seleção exige: título aderente ao conteúdo do edital, explicação em português, canal especializado em concursos ou docente identificado e sinais públicos de aceitação, como volume de visualizações, comentários disponíveis e recorrência do canal na preparação para concursos. Não serão exibidas notas, estrelas ou avaliações inventadas.
 
+## Controle de revisão
+
+| Campo | Registro |
+|---|---|
+| Responsável pela curadoria | Administração da plataforma Estudos PF |
+| Última revisão de disponibilidade e metadados | 19 de agosto de 2026 |
+| Periodicidade mínima | A cada atualização do edital e, no mínimo, semestralmente |
+| Escopo verificado | URL, título público, disciplina associada e aderência declarada ao concurso PF |
+| Limitação atual | A análise pedagógica quadro a quadro de uma amostra ainda depende de reprodução externa concluída; os vídeos permanecem complementares e não substituem a apostila autoral. |
+
 | Disciplina | Material localizado | Canal | Evidência pública consultada | URL |
 |---|---|---|---|---|
 | Língua Portuguesa | Reta Final Polícia Federal Pós-Edital: Língua Portuguesa — Prof. Adriana Figueiredo | Estratégia Concursos | Resultado de busca indicou 26 mil visualizações; página do vídeo confirmou título e foco em PF | https://www.youtube.com/watch?v=wddPyKWiXho |

@@ -1,0 +1,13 @@
+.git
+.github
+node_modules
+dist
+backend/.venv
+backend/staticfiles
+backend/media
+.env
+.env.*
+!.env.example
+.manus-logs
+tmp
+*.log

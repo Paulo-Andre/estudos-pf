@@ -1,0 +1,1 @@
+ALTER TABLE `platformAlerts` ADD `categoryLabel` varchar(80);

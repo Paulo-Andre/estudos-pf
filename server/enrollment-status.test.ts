@@ -13,6 +13,10 @@ describe("status temporal da matrícula", () => {
     expect(getEnrollmentLifecycleStatus(base, now)).toBe("active");
   });
 
+  it("trata a diferença de até um segundo da precisão do banco como acesso imediato", () => {
+    expect(getEnrollmentLifecycleStatus({ ...base, startAt: new Date("2026-08-18T12:00:00.900Z") }, now)).toBe("active");
+  });
+
   it("marca como vencida após o limite", () => {
     expect(getEnrollmentLifecycleStatus({ ...base, expiresAt: new Date("2026-08-18T11:59:59.000Z") }, now)).toBe("expired");
   });

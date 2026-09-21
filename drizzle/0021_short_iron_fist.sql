@@ -1,0 +1,1 @@
+ALTER TABLE `courses` ADD `courseType` enum('concurso','tutorial') DEFAULT 'concurso' NOT NULL;
