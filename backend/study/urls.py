@@ -1,7 +1,7 @@
 from django.urls import path
 from .views import (
-    AnswerView,BookmarkDetailView,BookmarkListView,CompleteView,ContentProgressView,CourseProgressView,DailyQuickCheckView,
-    NoteView,ResumeView,ReviewDeleteView,ReviewItemsView,ReviewMasteredView,
+    AnswerView,BookmarkDetailView,BookmarkListView,CompleteView,ContentProgressView,CourseProgressView,DailyQuickCheckView,LearningPlanView,
+    NoteView,ResumeView,ReviewDeleteView,ReviewItemsView,ReviewMasteredView,ReviewRateView,
     RoadmapDeleteView,RoadmapView,SimulationDetailView,StateView,StudyQuestionsView,
     SubmitSimulationView,WeeklyGoalView,
 )
@@ -16,6 +16,7 @@ urlpatterns=[
     path("simulations/<str:simulation_id>/",SimulationDetailView.as_view()),
     path("review/",ReviewItemsView.as_view()),
     path("review/<int:item_id>/mastered/",ReviewMasteredView.as_view()),
+    path("review/<int:item_id>/rate/",ReviewRateView.as_view()),
     path("review/<int:item_id>/",ReviewDeleteView.as_view()),
     path("courses/<str:course_id>/progress/",CourseProgressView.as_view()),
     path("courses/<str:course_id>/content/<int:content_id>/progress/",ContentProgressView.as_view()),
@@ -25,4 +26,5 @@ urlpatterns=[
     path("bookmarks/",BookmarkListView.as_view()),
     path("bookmarks/<int:item_id>/",BookmarkDetailView.as_view()),
     path("weekly-goal/",WeeklyGoalView.as_view()),
+    path("learning-plan/",LearningPlanView.as_view()),
 ]

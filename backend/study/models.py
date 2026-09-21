@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.db import models
+from django.utils import timezone
 
 class StudyProfile(models.Model):
     id=models.BigAutoField(primary_key=True)
@@ -57,9 +58,19 @@ class StudyReviewItem(models.Model):
     status=models.CharField(max_length=16,choices=Status.choices,default=Status.PENDING)
     created_at=models.DateTimeField(auto_now_add=True)
     reviewed_at=models.DateTimeField(null=True,blank=True)
+    source=models.CharField(max_length=24,default="manual")
+    due_at=models.DateTimeField(null=True,blank=True,default=timezone.now)
+    interval_days=models.PositiveIntegerField(default=0)
+    ease_factor=models.FloatField(default=2.5)
+    repetitions=models.PositiveSmallIntegerField(default=0)
+    lapse_count=models.PositiveSmallIntegerField(default=0)
+    last_rating=models.CharField(max_length=16,blank=True,default="")
     class Meta:
         constraints=[models.UniqueConstraint(fields=["user","question_key"],name="review_user_question_uniq")]
-        indexes=[models.Index(fields=["user","status"],name="review_user_status_idx")]
+        indexes=[
+            models.Index(fields=["user","status"],name="review_user_status_idx"),
+            models.Index(fields=["user","status","due_at"],name="review_user_due_idx"),
+        ]
 
 class StudyContentProgress(models.Model):
     class Status(models.TextChoices):

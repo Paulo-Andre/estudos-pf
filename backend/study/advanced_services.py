@@ -1,4 +1,4 @@
-from datetime import date,time
+from datetime import date,time,timedelta
 from django.db import transaction
 from django.utils import timezone
 from courses.permissions import has_active_enrollment
@@ -33,8 +33,59 @@ def dismiss_daily_quick_check(user,course):
     profile.daily_quick_check_date=date.today();profile.daily_quick_check_course=course;profile.daily_quick_check_dismissed=True;profile.save();return True
 
 @transaction.atomic
-def queue_review(user,question_key,snapshot):
-    return StudyReviewItem.objects.update_or_create(user=user,question_key=question_key,defaults={"snapshot_json":snapshot,"status":"pending","reviewed_at":None})[0]
+def queue_review(user,question_key,snapshot,source="manual"):
+    now=timezone.now()
+    item,_=StudyReviewItem.objects.select_for_update().get_or_create(
+        user=user,question_key=question_key,
+        defaults={"snapshot_json":snapshot,"status":"pending","reviewed_at":None,"source":source,"due_at":now},
+    )
+    item.snapshot_json=snapshot
+    item.status="pending"
+    item.reviewed_at=None
+    item.source=source
+    item.due_at=now
+    if item.repetitions and source in {"answer_error","simulation_error"}:
+        item.repetitions=0
+        item.interval_days=0
+        item.lapse_count+=1
+        item.ease_factor=max(1.3,item.ease_factor-0.15)
+    item.save()
+    return item
+
+@transaction.atomic
+def rate_review(user,item_id,rating):
+    if rating not in {"again","hard","good","easy"}:
+        raise ValueError("Avaliação de revisão inválida.")
+    item=StudyReviewItem.objects.select_for_update().get(pk=item_id,user=user,status="pending")
+    now=timezone.now()
+    ease=float(item.ease_factor or 2.5)
+    interval=int(item.interval_days or 0)
+    repetitions=int(item.repetitions or 0)
+    if rating=="again":
+        item.repetitions=0
+        item.interval_days=0
+        item.lapse_count+=1
+        item.ease_factor=max(1.3,ease-0.2)
+        item.due_at=now+timedelta(minutes=10)
+    elif rating=="hard":
+        item.repetitions=repetitions+1
+        item.interval_days=max(1,2 if interval==0 else round(interval*1.2))
+        item.ease_factor=max(1.3,ease-0.15)
+        item.due_at=now+timedelta(days=item.interval_days)
+    elif rating=="good":
+        item.repetitions=repetitions+1
+        item.interval_days=3 if interval<=1 else max(interval+1,round(interval*ease))
+        item.ease_factor=ease
+        item.due_at=now+timedelta(days=item.interval_days)
+    else:
+        item.repetitions=repetitions+1
+        item.interval_days=7 if interval<=1 else max(interval+2,round(interval*(ease+0.3)))
+        item.ease_factor=min(3.2,ease+0.15)
+        item.due_at=now+timedelta(days=item.interval_days)
+    item.last_rating=rating
+    item.reviewed_at=now
+    item.save()
+    return item
 
 @transaction.atomic
 def mark_review_mastered(user,item_id):

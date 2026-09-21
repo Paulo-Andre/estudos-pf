@@ -85,13 +85,14 @@ async function queryProcedure(path: string, input: any) {
     case "auth.mfa": return api("/api/v1/auth/mfa/");
     case "study.bookmarks": return api("/api/v1/study/bookmarks/");
     case "study.weeklyGoal": return api("/api/v1/study/weekly-goal/");
+    case "study.learningPlan": return api("/api/v1/study/learning-plan/" + qs(input, ["courseId"]));
     case "study.state": return api("/api/v1/study/state/");
     case "study.access": return api("/api/v1/courses/access/");
     case "study.courseCatalog": return api("/api/v1/courses/");
     case "study.questions.list": return api("/api/v1/knowledge/courses/" + id(input.courseId) + "/questions/");
     case "study.bundle": return api("/api/v1/knowledge/courses/" + id(input.courseId) + "/study-bundle/");
     case "study.dailyCheck": return api("/api/v1/study/courses/" + id(input.courseId) + "/daily-check/");
-    case "study.review.list": return api("/api/v1/study/review/" + qs(input, ["status"]));
+    case "study.review.list": return api("/api/v1/study/review/" + qs(input, ["status","dueOnly"]));
     case "study.contentProgress.get": return api("/api/v1/study/courses/" + id(input.courseId) + "/progress/");
     case "study.roadmap.list": return api("/api/v1/study/roadmap/" + qs(input, ["courseId"]));
     case "study.note": return api("/api/v1/study/notes/" + id(input.moduleId) + "/");
@@ -164,6 +165,7 @@ async function mutationProcedure(path: string, input: any) {
     case "study.dismissDailyCheck": return api("/api/v1/study/courses/" + id(input.courseId) + "/daily-check/", { method: "DELETE" });
     case "study.review.add": return api("/api/v1/study/review/", json("POST", input));
     case "study.review.complete": return api("/api/v1/study/review/" + id(input.id) + "/mastered/", json("POST", {}));
+    case "study.review.rate": return api("/api/v1/study/review/" + id(input.id) + "/rate/", json("POST", { rating: input.rating }));
     case "study.review.remove": return api("/api/v1/study/review/" + id(input.id) + "/", { method: "DELETE" });
     case "study.contentProgress.open": return api("/api/v1/study/courses/" + id(input.courseId) + "/content/" + id(input.contentId) + "/progress/", json("POST", { completed: false }));
     case "study.contentProgress.complete": return api("/api/v1/study/courses/" + id(input.courseId) + "/content/" + id(input.contentId) + "/progress/", json("POST", { completed: true }));
