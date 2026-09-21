@@ -3,8 +3,6 @@ name: Full platform validation
 on:
   pull_request:
     branches: [main]
-  push:
-    branches: [codex/django-migration-foundation]
 
 jobs:
   node-platform:
@@ -42,8 +40,8 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Typecheck
         run: pnpm run check
-      - name: Prepare Node MySQL schema
-        run: pnpm run db:push
+      - name: Prepare disposable Node MySQL schema
+        run: pnpm exec drizzle-kit push --force
       - name: Seed local ROOT and default catalog
         run: pnpm exec tsx scripts/ci-seed-node.ts
       - name: Tests without live external credentials
