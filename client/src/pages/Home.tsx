@@ -237,7 +237,7 @@ function StudyWorkspace({ user, logout, initialView, initialCommercePlanId, onCo
   const simulationMutation = trpc.study.submitSimulation.useMutation();
   const addPersonalReviewMutation = trpc.study.review.add.useMutation();
   const completePersonalReviewMutation = trpc.study.review.complete.useMutation();
-  const ratePersonalReviewMutation = trpc.study.review.rate.useMutation();
+  const ratePersonalReviewMutation = (trpc.study.review as any).rate.useMutation();
   const removePersonalReviewMutation = trpc.study.review.remove.useMutation();
   const dismissDailyCheckMutation = trpc.study.dismissDailyCheck.useMutation({ onSuccess: () => void dailyCheckQuery.refetch() });
 
