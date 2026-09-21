@@ -53,7 +53,10 @@ async function api(path: string, init: RequestInit = {}) {
   if (text) {
     try { data = JSON.parse(text); } catch { data = text; }
   }
-  if (!response.ok) throw new Error(errorMessage(data, "Falha na comunicação com o servidor."));
+  if (!response.ok) {
+    const error:any=new Error(errorMessage(data, "Falha na comunicação com o servidor."));
+    error.status=response.status;error.data=data;throw error;
+  }
   return data;
 }
 
@@ -79,6 +82,7 @@ async function queryProcedure(path: string, input: any) {
     case "auth.preferences": return api("/api/v1/auth/preferences/");
     case "auth.sessions": return api("/api/v1/auth/sessions/");
     case "auth.securityEvents": return api("/api/v1/auth/security-events/");
+    case "auth.mfa": return api("/api/v1/auth/mfa/");
     case "study.bookmarks": return api("/api/v1/study/bookmarks/");
     case "study.weeklyGoal": return api("/api/v1/study/weekly-goal/");
     case "study.state": return api("/api/v1/study/state/");
@@ -149,6 +153,10 @@ async function mutationProcedure(path: string, input: any) {
     case "auth.revokeSession": return api("/api/v1/auth/sessions/" + id(input.id) + "/", { method: "DELETE" });
     case "auth.exportData": return api("/api/v1/auth/export/");
     case "auth.deleteAccount": return api("/api/v1/auth/delete/", json("DELETE", input));
+    case "auth.mfaSetup": return api("/api/v1/auth/mfa/setup/", json("POST", {}));
+    case "auth.mfaConfirm": return api("/api/v1/auth/mfa/confirm/", json("POST", input));
+    case "auth.mfaDisable": return api("/api/v1/auth/mfa/disable/", json("POST", input));
+    case "auth.mfaBackupCodes": return api("/api/v1/auth/mfa/backup-codes/", json("POST", input));
     case "study.bookmarks.add": return api("/api/v1/study/bookmarks/", json("POST", input));
     case "study.bookmarks.remove": return api("/api/v1/study/bookmarks/" + id(input.id) + "/", { method: "DELETE" });
     case "study.answer": return api("/api/v1/study/answer/", json("POST", input));

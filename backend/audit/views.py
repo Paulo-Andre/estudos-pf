@@ -12,4 +12,5 @@ class AuditView(APIView):
 class BackupView(APIView):
     permission_classes=[permissions.IsAdminUser]
     def get(self,request):
+        AdminAuditLog.objects.create(actor=request.user,action="EXPORTACAO_BACKUP",detail="Backup lógico sanitizado exportado pelo administrador.")
         return Response(logical_backup())
