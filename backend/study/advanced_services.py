@@ -40,6 +40,8 @@ def daily_quick_check(user,course):
 
 @transaction.atomic
 def dismiss_daily_quick_check(user,course):
+    if not has_active_enrollment(user,course.id):
+        raise PermissionError("Matrícula vigente necessária.")
     profile,_=StudyProfile.objects.select_for_update().get_or_create(user=user)
     profile.daily_quick_check_date=date.today()
     profile.daily_quick_check_course=course
@@ -61,6 +63,12 @@ def mark_review_mastered(user,item_id):
     return item
 
 @transaction.atomic
+def remove_review_item(user,item_id):
+    item=StudyReviewItem.objects.select_for_update().get(pk=item_id,user=user)
+    item.delete()
+    return True
+
+@transaction.atomic
 def mark_content_opened(user,course,content,completed=False):
     if not has_active_enrollment(user,course.id):
         raise PermissionError("Matrícula vigente necessária.")
@@ -70,5 +78,37 @@ def mark_content_opened(user,course,content,completed=False):
     progress,_=StudyContentProgress.objects.update_or_create(user=user,course=course,content=content,defaults=defaults)
     return progress
 
+def course_progress(user,course):
+    if not has_active_enrollment(user,course.id):
+        raise PermissionError("Matrícula vigente necessária.")
+    return StudyContentProgress.objects.filter(user=user,course=course).select_related("content").order_by("content_id")
+
 def resume_content(user,course):
+    if not has_active_enrollment(user,course.id):
+        raise PermissionError("Matrícula vigente necessária.")
     return StudyContentProgress.objects.filter(user=user,course=course).select_related("content").order_by("-last_opened_at").first()
+
+def roadmap_items(user,course):
+    if not has_active_enrollment(user,course.id):
+        raise PermissionError("Matrícula vigente necessária.")
+    return StudyRoadmapItem.objects.filter(user=user,course=course,is_active=True).select_related("course","content","discipline").order_by("weekday","start_time")
+
+@transaction.atomic
+def save_roadmap_item(user,course,content,discipline,weekday,start_time,is_active=True):
+    if not has_active_enrollment(user,course.id):
+        raise PermissionError("Matrícula vigente necessária.")
+    if discipline and not discipline.course_links.filter(course=course).exists():
+        raise ValueError("A disciplina não pertence a este curso.")
+    if not content.discipline_links.filter(discipline__course_links__course=course).exists():
+        raise ValueError("O conteúdo não pertence a este curso.")
+    item,_=StudyRoadmapItem.objects.update_or_create(
+        user=user,course=course,discipline=discipline,
+        defaults={"content":content,"weekday":weekday,"start_time":start_time,"is_active":is_active},
+    )
+    return item
+
+@transaction.atomic
+def remove_roadmap_item(user,item_id):
+    item=StudyRoadmapItem.objects.select_for_update().get(pk=item_id,user=user)
+    item.delete()
+    return True
