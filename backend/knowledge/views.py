@@ -217,3 +217,31 @@ class AdminReviewDecisionView(APIView):
         try:review=decide_review(review_id,request.user,decision,notes)
         except (ValueError,ReviewQueue.DoesNotExist,Question.DoesNotExist,Content.DoesNotExist) as exc:return Response({"detail":str(exc)},status=400)
         return Response({"id":review.id,"status":review.status})
+
+
+class CourseStudyBundleView(APIView):
+    """Pacote protegido de estudo. Só retorna conteúdo para matrícula ativa."""
+    def get(self,request,course_id):
+        if not has_active_enrollment(request.user,course_id):
+            return Response({"detail":"Matrícula vigente necessária."},status=403)
+        from courses.models import CourseContent
+        rows=CourseContent.objects.filter(course_id=course_id,is_published=True).order_by("order","id")
+        modules=[]
+        chapters={}
+        for row in rows:
+            payload=row.body_json or {}
+            module=payload.get("module")
+            chapter=payload.get("chapter")
+            if module:
+                modules.append(module)
+            if chapter:
+                chapters[row.module_id]=chapter
+        questions=Question.objects.filter(
+            content_links__content__discipline_links__discipline__course_links__course_id=course_id
+        ).distinct().order_by("id")
+        return Response({
+            "courseId":course_id,
+            "modules":modules,
+            "chapters":chapters,
+            "questions":[full_question_json(q) for q in questions if can_use_question(q)],
+        })

@@ -47,6 +47,7 @@ class Content(models.Model):
         ]
 
 class Question(models.Model):
+    legacy_key=models.CharField(max_length=80,unique=True,null=True,blank=True)
     class QuestionType(models.TextChoices):
         TRUE_FALSE="certo_errado","Certo/Errado"
         MULTIPLE_CHOICE="multipla_escolha","Múltipla escolha"

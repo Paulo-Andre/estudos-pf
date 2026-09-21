@@ -1,9 +1,10 @@
 from django.urls import path
-from .views import AdminContentDetailView,AdminContentsView,AdminDisciplineDetailView,AdminDisciplinesView,AdminQuestionDetailView,AdminQuestionsView,AdminReviewDecisionView,AdminReviewPendingCountView,AdminReviewQueueView,AdminReviewSubmitView,ContentChangelogView,CourseLibraryView,EligibleQuestionsView,QuestionChangelogView
+from .views import AdminContentDetailView,AdminContentsView,AdminDisciplineDetailView,AdminDisciplinesView,AdminQuestionDetailView,AdminQuestionsView,AdminReviewDecisionView,AdminReviewPendingCountView,AdminReviewQueueView,AdminReviewSubmitView,ContentChangelogView,CourseLibraryView,CourseStudyBundleView,EligibleQuestionsView,QuestionChangelogView
 
 urlpatterns=[
     path("courses/<str:course_id>/library/",CourseLibraryView.as_view()),
     path("courses/<str:course_id>/questions/",EligibleQuestionsView.as_view()),
+    path("courses/<str:course_id>/study-bundle/",CourseStudyBundleView.as_view()),
     path("admin/disciplines/",AdminDisciplinesView.as_view()),
     path("admin/disciplines/<int:discipline_id>/",AdminDisciplineDetailView.as_view()),
     path("admin/contents/",AdminContentsView.as_view()),
