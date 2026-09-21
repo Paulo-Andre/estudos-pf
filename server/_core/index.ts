@@ -8,6 +8,8 @@ import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { ensureRootAccount } from "../auth/rootBootstrap";
+import { processMercadoPagoWebhook, resolveMercadoPagoNotificationDataId } from "../mercadoPago";
+import { weeklyResetHandler } from "../weeklyReset";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -32,10 +34,43 @@ async function startServer() {
   await ensureRootAccount();
   const app = express();
   const server = createServer(app);
-  // Configure body parser with larger size limit for file uploads
-  app.use(express.json({ limit: "50mb" }));
-  app.use(express.urlencoded({ limit: "50mb", extended: true }));
+  app.disable("x-powered-by");
+  app.use((req, res, next) => {
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    // A prévia ROOT é carregada pela mesma origem; as demais páginas seguem sem poder ser incorporadas.
+    const isSameOriginStorefrontPreview = req.path === "/" && req.query.preview === "storefront";
+    res.setHeader("X-Frame-Options", isSameOriginStorefrontPreview ? "SAMEORIGIN" : "DENY");
+    res.setHeader("Content-Security-Policy", isSameOriginStorefrontPreview ? "frame-ancestors 'self'" : "frame-ancestors 'none'");
+    res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+    res.setHeader("Permissions-Policy", "camera=(), geolocation=(), microphone=()");
+    res.setHeader("Cross-Origin-Opener-Policy", "same-origin");
+    next();
+  });
+  // O limite cobre os uploads de imagem permitidos (até 4 MB) sem aceitar cargas desnecessariamente grandes.
+  app.use(express.json({ limit: "8mb" }));
+  app.use(express.urlencoded({ limit: "8mb", extended: true }));
   registerStorageProxy(app);
+  app.post("/api/payments/mercado-pago/webhook", async (req, res) => {
+    try {
+      const dataId = resolveMercadoPagoNotificationDataId({
+        queryDataId: req.query["data.id"],
+        queryId: req.query.id,
+        body: req.body,
+      });
+      const result = await processMercadoPagoWebhook({
+        xSignature: req.header("x-signature"),
+        xRequestId: req.header("x-request-id"),
+        dataId,
+        topic: req.query.topic ?? req.body?.type,
+        isOfficialSimulation: req.body?.live_mode === false && dataId === "123456",
+      });
+      res.status(200).json({ received: true, result: result.action });
+    } catch (error) {
+      console.error("[Mercado Pago webhook] rejeitado:", error instanceof Error ? error.message : error);
+      res.status(400).json({ received: false });
+    }
+  });
+  app.post("/api/scheduled/weeklyReset", weeklyResetHandler);
   // tRPC API
   app.use(
     "/api/trpc",
