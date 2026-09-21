@@ -15,7 +15,6 @@ class Migration(migrations.Migration):
                 ("secret_encrypted",models.TextField(blank=True,default="")),
                 ("enabled",models.BooleanField(default=False)),
                 ("backup_code_hashes",models.JSONField(blank=True,default=list)),
-                ("last_totp_step",models.BigIntegerField(blank=True,null=True)),
                 ("confirmed_at",models.DateTimeField(blank=True,null=True)),
                 ("updated_at",models.DateTimeField(auto_now=True)),
                 ("user",models.OneToOneField(on_delete=django.db.models.deletion.CASCADE,related_name="account_mfa",to=settings.AUTH_USER_MODEL)),
