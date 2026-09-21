@@ -1,0 +1,17 @@
+{
+  "name": "Núcleo Concursos",
+  "short_name": "Núcleo",
+  "description": "Plataforma de estudos para concursos com trilhas, questões, revisão e simulados.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#e8e4d9",
+  "theme_color": "#0e5a70",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
