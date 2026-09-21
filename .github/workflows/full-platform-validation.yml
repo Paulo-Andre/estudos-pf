@@ -41,6 +41,8 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Typecheck
         run: pnpm run check
+      - name: Assert REST adapter coverage
+        run: node scripts/assert-rest-adapter-coverage.mjs
       - name: Export protected study seed
         run: pnpm exec tsx scripts/export-protected-study-seed.ts tmp/protected-study-seed.json
       - name: Upload protected study seed
