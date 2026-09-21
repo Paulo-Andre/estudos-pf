@@ -23,6 +23,7 @@ COPY --from=frontend /src/dist/public /app/dist/public
 WORKDIR /app/backend
 RUN DEBUG=0 \
     DJANGO_SECRET_KEY=build-only-not-runtime \
+    PII_MASTER_KEY=build-only-not-runtime-pii \
     DATABASE_URL=mysql://build:build@127.0.0.1:3306/build \
     python manage.py collectstatic --noinput
 EXPOSE 8000
