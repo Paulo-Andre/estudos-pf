@@ -9,6 +9,28 @@ on:
 jobs:
   node-platform:
     runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: estudos_pf_node
+        ports:
+          - 3307:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -proot"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+    env:
+      NODE_ENV: test
+      DATABASE_URL: mysql://root:root@127.0.0.1:3307/estudos_pf_node
+      ROOT_INITIAL_PASSWORD: CI-Root-Password-2026!
+      JWT_SECRET: ci-cookie-secret-long-enough-for-tests
+      MERCADO_PAGO_WEBHOOK_SECRET: ci-mercado-pago-webhook-secret
+      RESEND_API_KEY: re_ci_placeholder_only
+      RESEND_FROM_EMAIL: Núcleo Concursos <onboarding@resend.dev>
+      PUBLIC_APP_URL: http://127.0.0.1:3000
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -20,8 +42,16 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Typecheck
         run: pnpm run check
-      - name: Tests
-        run: pnpm run test
+      - name: Prepare Node MySQL schema
+        run: pnpm run db:push
+      - name: Seed local ROOT and default catalog
+        run: pnpm exec tsx scripts/ci-seed-node.ts
+      - name: Tests without live external credentials
+        run: >
+          pnpm exec vitest run
+          --exclude server/mercado-pago.credentials.test.ts
+          --exclude server/resend.credentials.test.ts
+          --exclude server/commerce.integration.test.ts
       - name: Production build
         run: pnpm run build
 
