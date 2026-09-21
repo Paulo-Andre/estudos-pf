@@ -5,6 +5,7 @@ class AccountProfile(models.Model):
     class Role(models.TextChoices):
         USER="user","Usuário"
         ADMIN="admin","Administrador"
+    id=models.BigAutoField(primary_key=True)
     user=models.OneToOneField(settings.AUTH_USER_MODEL,on_delete=models.CASCADE,related_name="account_profile")
     display_name=models.CharField(max_length=160)
     role=models.CharField(max_length=16,choices=Role.choices,default=Role.USER)

@@ -12,6 +12,7 @@ class Course(models.Model):
     updated_at=models.DateTimeField(auto_now=True)
 
 class CourseEnrollment(models.Model):
+    id=models.BigAutoField(primary_key=True)
     user=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.CASCADE,related_name="course_enrollments")
     course=models.ForeignKey(Course,on_delete=models.PROTECT,related_name="enrollments")
     start_at=models.DateTimeField()
@@ -26,6 +27,7 @@ class CourseEnrollment(models.Model):
                      models.CheckConstraint(condition=Q(expires_at__gt=F("start_at")),name="enroll_valid_period")]
 
 class CourseContent(models.Model):
+    id=models.BigAutoField(primary_key=True)
     course=models.ForeignKey(Course,on_delete=models.CASCADE,related_name="contents")
     module_id=models.CharField(max_length=80)
     discipline=models.CharField(max_length=160,blank=True,default="")
