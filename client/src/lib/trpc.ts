@@ -74,7 +74,8 @@ async function queryProcedure(path: string, input: any) {
     case "study.state": return api("/api/v1/study/state/");
     case "study.access": return api("/api/v1/courses/access/");
     case "study.courseCatalog": return api("/api/v1/courses/");
-    case "study.questions.list": return api("/api/v1/study/questions/");
+    case "study.questions.list": return api("/api/v1/knowledge/courses/" + id(input.courseId) + "/questions/");
+    case "study.bundle": return api("/api/v1/knowledge/courses/" + id(input.courseId) + "/study-bundle/");
     case "study.dailyCheck": return api("/api/v1/study/courses/" + id(input.courseId) + "/daily-check/");
     case "study.review.list": return api("/api/v1/study/review/" + qs(input, ["status"]));
     case "study.contentProgress.get": return api("/api/v1/study/courses/" + id(input.courseId) + "/progress/");

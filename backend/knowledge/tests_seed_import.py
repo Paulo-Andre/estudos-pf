@@ -47,4 +47,4 @@ class ProtectedSeedImportTests(TestCase):
         allowed=client.get("/api/v1/knowledge/courses/pf-agente/study-bundle/")
         self.assertEqual(allowed.status_code,200)
         self.assertEqual(allowed.data["modules"][0]["id"],"lp-01")
-        self.assertEqual(allowed.data["questions"][0]["id"],"q-001")
+        self.assertEqual(allowed.data["questions"][0]["legacyKey"],"q-001")

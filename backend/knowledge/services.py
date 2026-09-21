@@ -48,7 +48,7 @@ def decide_review(review_id,user,decision,notes=""):
 
 def question_payload(question):
     return {
-        "id":question.legacy_key or str(question.id),"statement":question.statement,"questionType":question.question_type,
+        "id":question.id,"legacyKey":question.legacy_key,"statement":question.statement,"questionType":question.question_type,
         "options":question.options_json,"answer":question.answer_json,"explanation":question.explanation,
         "difficulty":question.difficulty,"source":question.source,"banca":question.banca,"year":question.year,
         "status":question.status,"requiresReview":question.requires_review,

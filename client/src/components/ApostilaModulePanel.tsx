@@ -4,8 +4,7 @@
  */
 import { useEffect, useState } from "react";
 import { Award, BookOpen, Brain, Check, ExternalLink, Loader2, Sparkles, X } from "lucide-react";
-import type { DetailedStudyModule } from "@/data/pfCompleteStudyData";
-import type { ApostilaChapter } from "@/data/pfApostilaData";
+import type { DetailedStudyModule, ApostilaChapter } from "@/types/study";
 import { curatedVideoForModule } from "@/data/pfCuratedVideos";
 import { trpc } from "@/lib/trpc";
 import { LessonVideoPlayer } from "@/components/LessonVideoPlayer";
