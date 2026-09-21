@@ -25,6 +25,7 @@ export function ApostilaModulePanel({ module, chapter, completed, onComplete, on
   const noteQuery = trpc.study.note.useQuery({ moduleId: module.id });
   const saveNote = trpc.study.saveNote.useMutation({ onSuccess: () => setNoteStatus("saved") });
   const isCorrect = challengeAnswer === module.lesson.challenge.correct;
+  const canComplete = completed || (isCorrect && revealRecall);
   const video = curatedVideoForModule(module.id);
 
   useEffect(() => {
@@ -156,7 +157,7 @@ export function ApostilaModulePanel({ module, chapter, completed, onComplete, on
 
           <footer className="flex flex-col-reverse gap-3 border-t border-[#e6ded1] pt-5 sm:flex-row sm:justify-end">
             <button onClick={onClose} className="ghost-button">Voltar ao mapa</button>
-            <button onClick={() => { onComplete(); onClose(); }} disabled={completed} className="action-button disabled:cursor-default disabled:bg-[#6e969c]">{completed ? <><Check className="h-4 w-4" />Aula concluída</> : <><Award className="h-4 w-4" />Concluir aula · +20 XP</>}</button>
+            <div className="flex flex-col items-stretch gap-2 sm:items-end"><p className="max-w-sm text-right text-[10px] leading-4 text-[#718087]">{completed ? "Aula já concluída." : !isCorrect ? "Acerte o desafio para liberar a conclusão." : !revealRecall ? "Faça a recuperação ativa e confira a resposta antes de concluir." : "Checkpoint de aprendizagem concluído."}</p><button onClick={() => { onComplete(); onClose(); }} disabled={!canComplete} className="action-button disabled:cursor-not-allowed disabled:bg-[#8aa1a5]">{completed ? <><Check className="h-4 w-4" />Aula concluída</> : <><Award className="h-4 w-4" />Concluir aula · +20 XP</>}</button></div>
           </footer>
         </div>
       </article>
