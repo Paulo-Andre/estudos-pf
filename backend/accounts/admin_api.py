@@ -11,7 +11,7 @@ from rest_framework.views import APIView
 from audit.models import AdminAuditLog
 from study.models import StudyAnswer,SimulationRecord
 from .cpf import is_valid_cpf,normalize_cpf
-from .models import AccountProfile,LoginAttempt,PasswordResetToken,SecurityEvent,TrackedSession
+from .models import AccountMFA,AccountProfile,LoginAttempt,PasswordResetToken,SecurityEvent,TrackedSession
 from .serializers import SafeUserSerializer
 from .pii import lookup_hash,set_profile_cpf
 from .services import delete_user_sessions,list_user_sessions,record_security_event,revoke_tracked_session
@@ -130,6 +130,8 @@ class AdminSecurityOverviewView(APIView):
             "activeResetTokens":PasswordResetToken.objects.filter(used_at__isnull=True,expires_at__gt=timezone.now()).count(),
             "rateLimitEntries":LoginAttempt.objects.count(),
             "plaintextCpfRecords":AccountProfile.objects.exclude(cpf__isnull=True).exclude(cpf="").count(),
+            "mfaEnabledUsers":AccountMFA.objects.filter(enabled=True).count(),
+            "adminsWithoutMfa":get_user_model().objects.filter(is_staff=True).exclude(account_mfa__enabled=True).count(),
         })
 
 class AdminSecurityEventsView(APIView):

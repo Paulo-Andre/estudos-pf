@@ -75,3 +75,12 @@ class PasswordResetToken(models.Model):
     created_at=models.DateTimeField(auto_now_add=True)
     class Meta:
         indexes=[models.Index(fields=["user","expires_at"],name="reset_user_expiry_idx")]
+
+
+class AccountMFA(models.Model):
+    user=models.OneToOneField(settings.AUTH_USER_MODEL,on_delete=models.CASCADE,related_name="account_mfa")
+    secret_encrypted=models.TextField(blank=True,default="")
+    enabled=models.BooleanField(default=False)
+    backup_code_hashes=models.JSONField(default=list,blank=True)
+    confirmed_at=models.DateTimeField(null=True,blank=True)
+    updated_at=models.DateTimeField(auto_now=True)

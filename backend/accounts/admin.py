@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import AccountPreferences,AccountProfile,LoginAttempt,PasswordResetToken,SecurityEvent,TrackedSession
+from .models import AccountMFA,AccountPreferences,AccountProfile,LoginAttempt,PasswordResetToken,SecurityEvent,TrackedSession
 
 @admin.register(AccountProfile)
 class AccountProfileAdmin(admin.ModelAdmin):
@@ -8,6 +8,7 @@ class AccountProfileAdmin(admin.ModelAdmin):
     readonly_fields=("cpf_encrypted","cpf_hash","legacy_password_hash")
 
 admin.site.register(AccountPreferences)
+admin.site.register(AccountMFA)
 admin.site.register(LoginAttempt)
 
 @admin.register(TrackedSession)

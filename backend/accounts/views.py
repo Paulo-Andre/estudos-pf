@@ -11,9 +11,10 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from .cpf import is_valid_cpf,normalize_cpf
 from .email import send_password_reset
-from .models import AccountPreferences,AccountProfile,SecurityEvent
+from .models import AccountMFA,AccountPreferences,AccountProfile,SecurityEvent,TrackedSession
 from .rate_limit import allowed,clear_success,keys,record_failure
 from .serializers import LoginSerializer,RegisterSerializer,SafeUserSerializer,USERNAME_RE
+from .mfa import begin_setup,confirm_setup,disable as disable_mfa,regenerate_backup_codes,status_for as mfa_status,verify_code as verify_mfa_code
 from .pii import get_profile_cpf,lookup_hash,set_profile_cpf
 from .services import consume_password_reset,create_password_reset,delete_user_sessions,list_user_sessions,record_security_event,revoke_tracked_session,touch_current_session,track_current_session
 
@@ -36,7 +37,7 @@ class RegisterView(APIView):
         record_failure(limiter)
         s=RegisterSerializer(data=request.data);s.is_valid(raise_exception=True);user=s.save();clear_success(limiter);login(request,user)
         track_current_session(request,user);record_security_event(request,"register_success",user)
-        return Response(SafeUserSerializer(user).data,status=status.HTTP_201_CREATED)
+        return Response({"user":SafeUserSerializer(user).data,"hadActiveSession":False},status=status.HTTP_201_CREATED)
 
 @method_decorator(csrf_protect,name="dispatch")
 class LoginView(APIView):
@@ -49,11 +50,19 @@ class LoginView(APIView):
         if not user:
             record_failure(pair);record_security_event(request,"login_failed",metadata={"identifierHash":lookup_hash(s.validated_data["identifier"].strip().lower())})
             return Response({"detail":"Usuário ou senha inválidos."},status=401)
+        mfa=AccountMFA.objects.filter(user=user,enabled=True).first()
+        if mfa and not s.validated_data.get("otp"):
+            record_security_event(request,"mfa_challenge",user)
+            return Response({"detail":"Código de autenticação necessário.","mfaRequired":True},status=428)
+        if mfa and not verify_mfa_code(user,s.validated_data.get("otp")):
+            record_failure(pair);record_security_event(request,"mfa_failed",user)
+            return Response({"detail":"Código de autenticação inválido.","mfaRequired":True},status=401)
         clear_success(pair)
+        had_active=TrackedSession.objects.filter(user=user,revoked_at__isnull=True).exists()
         profile,_=AccountProfile.objects.get_or_create(user=user,defaults={"display_name":user.get_full_name() or user.username})
         profile.last_signed_in=timezone.now();profile.save()
-        login(request,user);track_current_session(request,user);record_security_event(request,"login_success",user)
-        return Response(SafeUserSerializer(user).data)
+        login(request,user);track_current_session(request,user);record_security_event(request,"login_success",user,{"mfa":bool(mfa)})
+        return Response({"user":SafeUserSerializer(user).data,"hadActiveSession":had_active})
 
 class LogoutView(APIView):
     def post(self,request):
@@ -201,3 +210,33 @@ class DataExportView(APIView):
         }
         record_security_event(request,"data_exported",request.user)
         return Response(payload)
+
+
+class MFAStatusView(APIView):
+    def get(self,request):return Response(mfa_status(request.user))
+
+class MFASetupView(APIView):
+    def post(self,request):
+        data=begin_setup(request.user);record_security_event(request,"mfa_setup_started",request.user)
+        return Response(data)
+
+class MFAConfirmView(APIView):
+    def post(self,request):
+        try:codes=confirm_setup(request.user,request.data.get("code"))
+        except ValueError as exc:return Response({"detail":str(exc)},status=400)
+        record_security_event(request,"mfa_enabled",request.user)
+        return Response({"enabled":True,"backupCodes":codes})
+
+class MFADisableView(APIView):
+    def post(self,request):
+        try:disable_mfa(request.user,request.data.get("password"),request.data.get("code"))
+        except ValueError as exc:return Response({"detail":str(exc)},status=400)
+        record_security_event(request,"mfa_disabled",request.user)
+        return Response({"enabled":False})
+
+class MFABackupCodesView(APIView):
+    def post(self,request):
+        try:codes=regenerate_backup_codes(request.user,request.data.get("code"))
+        except ValueError as exc:return Response({"detail":str(exc)},status=400)
+        record_security_event(request,"mfa_backup_codes_regenerated",request.user)
+        return Response({"backupCodes":codes})

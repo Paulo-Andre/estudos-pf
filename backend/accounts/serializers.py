@@ -68,3 +68,4 @@ class RegisterSerializer(serializers.Serializer):
 class LoginSerializer(serializers.Serializer):
     identifier=serializers.CharField(min_length=3,max_length=320)
     password=serializers.CharField(min_length=8,max_length=128,write_only=True)
+    otp=serializers.CharField(required=False,allow_blank=True,max_length=32,write_only=True)
