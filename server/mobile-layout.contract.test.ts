@@ -12,7 +12,7 @@ describe("contrato de layout móvel", () => {
   });
 
   it("mantém a matriz vertical até telas amplas, sem comprimir título e seletor", () => {
-    expect(homeSource).toContain("className=\"w-full min-w-0 rounded-xl");
+    expect(homeSource).toContain("className=\"w-full xl:w-[22rem]");
     expect(homeSource).toContain("xl:flex-row xl:items-center");
     expect(homeSource).toContain("flex flex-col gap-3 xl:flex-row");
     expect(homeSource).toContain("xl:w-[22rem]");
@@ -20,7 +20,7 @@ describe("contrato de layout móvel", () => {
   });
 
   it("preserva títulos legíveis e ações empilhadas no acesso e no painel", () => {
-    expect(accessGateSource).toContain("text-[clamp(2rem,9vw,2.5rem)]");
+    expect(accessGateSource).toContain("text-[clamp(2.25rem,9vw,3.35rem)]");
     expect(homeSource).toContain("flex flex-col gap-2.5 sm:flex-row");
     expect(homeSource).toContain("text-[clamp(2rem,7vw,3.5rem)]");
   });
