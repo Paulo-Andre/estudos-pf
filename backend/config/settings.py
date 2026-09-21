@@ -63,8 +63,32 @@ STATIC_URL="/static/"
 STATIC_ROOT="staticfiles"
 MEDIA_URL="/media/"
 MEDIA_ROOT="media"
+S3_BUCKET=os.getenv("S3_BUCKET","").strip()
+S3_ENDPOINT_URL=os.getenv("S3_ENDPOINT_URL","").strip()
+S3_ACCESS_KEY=os.getenv("S3_ACCESS_KEY","").strip()
+S3_SECRET_KEY=os.getenv("S3_SECRET_KEY","").strip()
+S3_REGION=os.getenv("S3_REGION","auto").strip()
+S3_PUBLIC_BASE_URL=os.getenv("S3_PUBLIC_BASE_URL","").strip().rstrip("/")
+
+if S3_BUCKET and S3_ENDPOINT_URL and S3_ACCESS_KEY and S3_SECRET_KEY:
+    default_storage_options={
+        "bucket_name":S3_BUCKET,
+        "endpoint_url":S3_ENDPOINT_URL,
+        "access_key":S3_ACCESS_KEY,
+        "secret_key":S3_SECRET_KEY,
+        "region_name":S3_REGION,
+        "default_acl":None,
+        "querystring_auth":not bool(S3_PUBLIC_BASE_URL),
+        "file_overwrite":False,
+    }
+    if S3_PUBLIC_BASE_URL:
+        default_storage_options["custom_domain"]=S3_PUBLIC_BASE_URL.replace("https://","").replace("http://","")
+    DEFAULT_STORAGE={"BACKEND":"storages.backends.s3.S3Storage","OPTIONS":default_storage_options}
+else:
+    DEFAULT_STORAGE={"BACKEND":"django.core.files.storage.FileSystemStorage"}
+
 STORAGES={
-    "default":{"BACKEND":os.getenv("DJANGO_STORAGE_BACKEND","django.core.files.storage.FileSystemStorage")},
+    "default":DEFAULT_STORAGE,
     "staticfiles":{"BACKEND":"whitenoise.storage.CompressedManifestStaticFilesStorage"},
 }
 DEFAULT_AUTO_FIELD="django.db.models.BigAutoField"
