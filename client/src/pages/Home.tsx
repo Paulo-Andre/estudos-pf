@@ -221,7 +221,7 @@ function StudyWorkspace({ user, logout, initialView, initialCommercePlanId, onCo
   const bookmarksQuery = trpc.study.bookmarks.useQuery(undefined, { enabled: hasConfirmedCourseAccess, refetchOnWindowFocus: false });
   const centralQuestionsQuery = (trpc.study.questions.list as any).useQuery({ courseId: effectiveContestId }, { enabled: canUseActiveCourse, refetchOnWindowFocus: false });
   const dailyCheckQuery = trpc.study.dailyCheck.useQuery({ courseId: effectiveContestId }, { enabled: user.role !== "admin" && permittedContestIds.includes(effectiveContestId), refetchOnWindowFocus: false });
-  const personalReviewsQuery = trpc.study.review.list.useQuery({ dueOnly: true }, { enabled: hasConfirmedCourseAccess && !tutorialCourse, refetchOnWindowFocus: false });
+  const personalReviewsQuery = (trpc.study.review.list as any).useQuery({ dueOnly: true }, { enabled: hasConfirmedCourseAccess && !tutorialCourse, refetchOnWindowFocus: false });
   const contentProgressQuery = trpc.study.contentProgress.get.useQuery({ courseId: effectiveContestId }, { enabled: canUseActiveCourse, refetchOnWindowFocus: false });
   const learningPlanQuery = trpc.study.learningPlan.useQuery({ courseId: effectiveContestId }, { enabled: canUseActiveCourse, refetchOnWindowFocus: false });
   const roadmapQuery = trpc.study.roadmap.list.useQuery({ courseId: effectiveContestId }, { enabled: canUseActiveCourse, refetchOnWindowFocus: false });
