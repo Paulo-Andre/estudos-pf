@@ -29,7 +29,7 @@ const capitulo = (abertura: string, secoes: ApostilaSection[], praticaAtiva: str
 
 const manualRedacao: ApostilaReference = {
   rotulo: "Manual de Redação da Presidência da República",
-  url: "https://www4.planalto.gov.br/centrodeestudos/assuntos/manual-de-redacao-da-presidencia-da-republica",
+  url: "https://www.gov.br/pt-br/servicos/consultar-o-manual-de-redacao-da-presidencia-da-republica",
   nota: "Use a edição oficial para conferir a estrutura atualizada dos expedientes e os padrões de redação.",
 };
 
@@ -545,7 +545,7 @@ export const apostilaByModule: Record<string, ApostilaChapter> = {
       { titulo: "Não discriminação", paragrafos: ["Tratar igualmente não significa ignorar desigualdades reais. Medidas voltadas a remover barreiras históricas e assegurar igualdade efetiva podem ser compatíveis com a proteção antidiscriminatória quando possuem base e finalidade legítimas. O estudo deve distinguir diferenciação justificável de discriminação baseada em critério proibido ou desproporcional."], },
     ],
     "Crie tabela de comparação: genocídio, refúgio, discriminação racial e discriminação contra a mulher. Registre definição, elemento central e dever estatal de cada instrumento.",
-    { rotulo: "ONU — Tratados de Direitos Humanos", url: "https://www.ohchr.org/en/instruments-mechanisms/instruments", nota: "Repositório oficial de instrumentos internacionais de direitos humanos." },
+    { rotulo: "ONU — Tratados de Direitos Humanos", url: "https://www.ohchr.org/en/instruments-listings", nota: "Repositório oficial de instrumentos internacionais de direitos humanos." },
   ),
   "dh-03": capitulo(
     "A proibição da tortura e do desaparecimento forçado decorre da dignidade humana e exige prevenção, investigação, responsabilização e reparação. A custódia estatal aumenta deveres de cuidado; pessoas privadas de liberdade continuam titulares de direitos.",
@@ -554,7 +554,7 @@ export const apostilaByModule: Record<string, ApostilaChapter> = {
       { titulo: "Regras de Mandela", paragrafos: ["As Regras Mínimas das Nações Unidas para o Tratamento de Pessoas Presas, conhecidas como Regras de Mandela, fornecem parâmetros internacionais de tratamento digno, saúde, disciplina, contato com o mundo externo, inspeção e proibição de maus-tratos. Não representam autorização para ignorar leis nacionais; orientam interpretação e aperfeiçoamento de práticas de custódia."], },
     ],
     "Ao analisar qualquer ato de custódia, use quatro perguntas: há base legal? é necessário? preserva dignidade? há registro e controle? Essa matriz aproxima teoria de situação operacional.",
-    { rotulo: "ONU — Regras de Mandela", url: "https://www.unodc.org/unodc/en/justice-and-prison-reform/Nelson_Mandela_Rules.html", nota: "Fonte oficial sobre as Regras Mínimas das Nações Unidas para o Tratamento de Pessoas Presas." },
+    { rotulo: "ONU — Regras de Mandela", url: "https://www.unodc.org/unodc/en/justice-and-prison-reform/nelsonmandelarules.html", nota: "Fonte oficial sobre as Regras Mínimas das Nações Unidas para o Tratamento de Pessoas Presas." },
   ),
   "dh-04": capitulo(
     "O uso da força deve seguir finalidade legítima, legalidade, necessidade, proporcionalidade, precaução, responsabilização e assistência posterior quando aplicável. Instrumentos de menor potencial ofensivo não dispensam avaliação de risco, treinamento e controle.",
