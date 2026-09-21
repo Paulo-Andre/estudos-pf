@@ -1,0 +1,57 @@
+name: Sync nucleo-concursos reference
+
+on:
+  push:
+    branches:
+      - codex/django-migration-foundation
+    paths:
+      - .github/workflows/sync-nucleo-reference.yml
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout target
+        uses: actions/checkout@v4
+        with:
+          ref: codex/django-migration-foundation
+          fetch-depth: 0
+
+      - name: Checkout functional reference
+        uses: actions/checkout@v4
+        with:
+          repository: Paulo-Andre/nucleo-concursos
+          ref: main
+          path: _nucleo
+          fetch-depth: 1
+
+      - name: Synchronize application reference
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf client server drizzle
+          cp -a _nucleo/client ./client
+          cp -a _nucleo/server ./server
+          cp -a _nucleo/drizzle ./drizzle
+          for file in package.json pnpm-lock.yaml tsconfig.json vite.config.ts vitest.config.ts components.json drizzle.config.ts render.yaml; do
+            if [ -f "_nucleo/$file" ]; then
+              cp "_nucleo/$file" "./$file"
+            fi
+          done
+          rm -rf _nucleo
+
+      - name: Commit synchronized reference
+        shell: bash
+        run: |
+          if git diff --quiet && git diff --cached --quiet; then
+            echo "No changes to synchronize."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add client server drizzle package.json pnpm-lock.yaml tsconfig.json vite.config.ts vitest.config.ts components.json drizzle.config.ts render.yaml
+          git commit -m "chore: sync full nucleo-concursos functional reference"
+          git push origin HEAD:codex/django-migration-foundation
