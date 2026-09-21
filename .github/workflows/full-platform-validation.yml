@@ -213,13 +213,13 @@ jobs:
         run: python manage.py migrate --noinput
       - name: Dry-run legacy import
         working-directory: backend
-        run: python manage.py import_legacy_core --dry-run
+        run: python manage.py import_legacy_core --dry-run --strict
       - name: Import legacy core
         working-directory: backend
-        run: python manage.py import_legacy_core
+        run: python manage.py import_legacy_core --strict
       - name: Re-run legacy import to prove idempotency
         working-directory: backend
-        run: python manage.py import_legacy_core
+        run: python manage.py import_legacy_core --strict
       - name: Assert migrated legacy state and password upgrade
         working-directory: backend
         run: python manage.py shell < ../scripts/assert-legacy-migration.py
