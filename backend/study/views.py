@@ -6,8 +6,9 @@ from courses.models import Course
 from courses.permissions import HasContestAccess,HasStudyAccess
 from knowledge.models import Content,Discipline,Question
 from knowledge.services import can_use_question,question_payload
-from .advanced_services import course_progress_payload,daily_quick_check,dismiss_daily_quick_check,mark_content_opened,mark_review_mastered,queue_review,remove_review_item,remove_roadmap_item,resume_content,roadmap_payload,save_roadmap_item
+from .advanced_services import course_progress_payload,daily_quick_check,dismiss_daily_quick_check,mark_content_opened,mark_review_mastered,queue_review,rate_review,remove_review_item,remove_roadmap_item,resume_content,roadmap_payload,save_roadmap_item
 from .models import StudyBookmark,StudyNote,StudyReviewItem,StudyRoadmapItem
+from .learning_services import learning_plan,queue_question_error
 from .services import answer,complete,simulation_detail,state,submit_simulation
 
 class StateView(APIView):
@@ -15,7 +16,12 @@ class StateView(APIView):
     def get(self,request):return Response(state(request.user))
 class AnswerView(APIView):
     permission_classes=[HasStudyAccess]
-    def post(self,request):return Response(answer(request.user,str(request.data.get("questionId") or "")[:80],bool(request.data.get("correct"))))
+    def post(self,request):
+        qid=str(request.data.get("questionId") or "")[:80]
+        correct=bool(request.data.get("correct"))
+        payload=answer(request.user,qid,correct)
+        if not correct:queue_question_error(request.user,qid,source="answer_error")
+        return Response(payload)
 class CompleteView(APIView):
     permission_classes=[HasStudyAccess]
     def post(self,request):return Response(complete(request.user,str(request.data.get("moduleId") or "")[:80]))
@@ -57,10 +63,11 @@ class StudyQuestionsView(APIView):
 class ReviewItemsView(APIView):
     permission_classes=[HasContestAccess]
     def get(self,request):
-        qs=StudyReviewItem.objects.filter(user=request.user,status=request.query_params.get("status") or "pending").order_by("-created_at")
-        return Response([{"id":x.id,"questionKey":x.question_key,"snapshot":x.snapshot_json,"status":x.status,"createdAt":x.created_at,"reviewedAt":x.reviewed_at} for x in qs])
+        qs=StudyReviewItem.objects.filter(user=request.user,status=request.query_params.get("status") or "pending").order_by("due_at","created_at")
+        return Response([{"id":x.id,"questionKey":x.question_key,"snapshot":x.snapshot_json,"status":x.status,"createdAt":x.created_at,"reviewedAt":x.reviewed_at,
+            "source":x.source,"dueAt":x.due_at,"intervalDays":x.interval_days,"repetitions":x.repetitions,"lapseCount":x.lapse_count,"lastRating":x.last_rating} for x in qs])
     def post(self,request):
-        item=queue_review(request.user,str(request.data.get("questionKey") or "")[:80],dict(request.data.get("snapshot") or {}));return Response({"id":item.id,"status":item.status},status=201)
+        item=queue_review(request.user,str(request.data.get("questionKey") or "")[:80],dict(request.data.get("snapshot") or {}),source=str(request.data.get("source") or "manual")[:24]);return Response({"id":item.id,"status":item.status,"dueAt":item.due_at},status=201)
 class ReviewMasteredView(APIView):
     permission_classes=[HasContestAccess]
     def post(self,request,item_id):
@@ -156,3 +163,20 @@ class WeeklyGoalView(APIView):
         days=len({d for d in (profile.study_dates if profile else []) if str(d)>=start.isoformat()})
         return Response({"weekStart":start.isoformat(),"questions":{"target":p.weekly_goal_questions,"current":answered},
             "days":{"target":p.weekly_goal_days,"current":days},"examDate":p.exam_date})
+
+
+class ReviewRateView(APIView):
+    permission_classes=[HasContestAccess]
+    def post(self,request,item_id):
+        try:item=rate_review(request.user,item_id,str(request.data.get("rating") or ""))
+        except StudyReviewItem.DoesNotExist:return Response({"detail":"Item não encontrado."},status=404)
+        except ValueError as exc:return Response({"detail":str(exc)},status=400)
+        return Response({"id":item.id,"status":item.status,"dueAt":item.due_at,"intervalDays":item.interval_days,
+            "repetitions":item.repetitions,"lastRating":item.last_rating})
+
+class LearningPlanView(APIView):
+    permission_classes=[HasStudyAccess]
+    def get(self,request):
+        course=get_object_or_404(Course,pk=request.query_params.get("courseId"))
+        try:return Response(learning_plan(request.user,course))
+        except PermissionError as exc:return Response({"detail":str(exc)},status=403)

@@ -43,6 +43,13 @@ def submit_simulation(user,data):
         question=Question.objects.filter(pk=item.get("questionId")).first()
         if question:snapshots.append(SimulationQuestion(simulation=record,question=question,position=position,answered_correctly=bool(item.get("correct")),snapshot_json=dict(item.get("snapshot") or {})))
     if snapshots:SimulationQuestion.objects.bulk_create(snapshots)
+    from .advanced_services import queue_review
+    for item in list(data.get("persistentAnswers") or []):
+        if bool(item.get("correct")):continue
+        question=Question.objects.filter(pk=item.get("questionId")).first()
+        if not question:continue
+        snapshot=dict(item.get("snapshot") or {})
+        queue_review(user,question.legacy_key or f"central-{question.pk}",snapshot,source="simulation_error")
     activity(user,correct*8+15,[str(x) for x in data.get("questionIds") or []]);return state(user)
 def simulation_detail(user,simulation_id):
     record=SimulationRecord.objects.filter(pk=simulation_id,user=user).first()
