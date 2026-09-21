@@ -8,6 +8,10 @@ class StudyProfile(models.Model):
     last_study_date=models.DateField(null=True,blank=True)
     study_dates=models.JSONField(default=list)
     used_question_ids=models.JSONField(default=list)
+    daily_quick_check_date=models.DateField(null=True,blank=True)
+    daily_quick_check_course=models.ForeignKey("courses.Course",on_delete=models.SET_NULL,null=True,blank=True,related_name="+")
+    daily_quick_check_question=models.ForeignKey("knowledge.Question",on_delete=models.SET_NULL,null=True,blank=True,related_name="+")
+    daily_quick_check_dismissed=models.BooleanField(default=False)
 
 class CompletedModule(models.Model):
     id=models.BigAutoField(primary_key=True)
@@ -42,3 +46,49 @@ class StudyNote(models.Model):
     content=models.TextField(blank=True,default="")
     class Meta:
         constraints=[models.UniqueConstraint(fields=["user","module_id"],name="note_user_module_uniq")]
+
+class StudyReviewItem(models.Model):
+    class Status(models.TextChoices):
+        PENDING="pending","Pendente"
+        MASTERED="mastered","Dominada"
+    user=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.CASCADE,related_name="study_review_items")
+    question_key=models.CharField(max_length=80)
+    snapshot_json=models.JSONField(default=dict)
+    status=models.CharField(max_length=16,choices=Status.choices,default=Status.PENDING)
+    created_at=models.DateTimeField(auto_now_add=True)
+    reviewed_at=models.DateTimeField(null=True,blank=True)
+    class Meta:
+        constraints=[models.UniqueConstraint(fields=["user","question_key"],name="review_user_question_uniq")]
+        indexes=[models.Index(fields=["user","status"],name="review_user_status_idx")]
+
+class StudyContentProgress(models.Model):
+    class Status(models.TextChoices):
+        STARTED="started","Iniciado"
+        COMPLETED="completed","Concluído"
+    user=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.CASCADE,related_name="content_progress")
+    course=models.ForeignKey("courses.Course",on_delete=models.CASCADE,related_name="student_progress")
+    content=models.ForeignKey("knowledge.Content",on_delete=models.CASCADE,related_name="student_progress")
+    status=models.CharField(max_length=16,choices=Status.choices,default=Status.STARTED)
+    started_at=models.DateTimeField(auto_now_add=True)
+    last_opened_at=models.DateTimeField(auto_now=True)
+    completed_at=models.DateTimeField(null=True,blank=True)
+    class Meta:
+        constraints=[models.UniqueConstraint(fields=["user","course","content"],name="progress_user_course_content_uniq")]
+        indexes=[models.Index(fields=["user","last_opened_at"],name="progress_user_last_idx")]
+
+class StudyRoadmapItem(models.Model):
+    user=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.CASCADE,related_name="roadmap_items")
+    course=models.ForeignKey("courses.Course",on_delete=models.CASCADE,related_name="roadmap_items")
+    content=models.ForeignKey("knowledge.Content",on_delete=models.CASCADE,related_name="roadmap_items")
+    discipline=models.ForeignKey("knowledge.Discipline",on_delete=models.SET_NULL,null=True,blank=True,related_name="roadmap_items")
+    weekday=models.PositiveSmallIntegerField()
+    start_time=models.TimeField()
+    is_active=models.BooleanField(default=True)
+    created_at=models.DateTimeField(auto_now_add=True)
+    updated_at=models.DateTimeField(auto_now=True)
+    class Meta:
+        constraints=[
+            models.UniqueConstraint(fields=["user","course","discipline"],name="roadmap_user_course_disc_uniq"),
+            models.CheckConstraint(condition=models.Q(weekday__gte=0,weekday__lte=6),name="roadmap_weekday_valid"),
+        ]
+        indexes=[models.Index(fields=["user","weekday","start_time"],name="roadmap_user_day_time_idx")]

@@ -1,3 +1,4 @@
 from django.contrib import admin
-from .models import StudyProfile,CompletedModule,StudyAnswer,SimulationRecord,StudyNote
-for m in [StudyProfile,CompletedModule,StudyAnswer,SimulationRecord,StudyNote]: admin.site.register(m)
+from .models import CompletedModule,SimulationRecord,StudyAnswer,StudyContentProgress,StudyNote,StudyProfile,StudyReviewItem,StudyRoadmapItem
+for m in [StudyProfile,CompletedModule,StudyAnswer,SimulationRecord,StudyNote,StudyReviewItem,StudyContentProgress,StudyRoadmapItem]:
+    admin.site.register(m)

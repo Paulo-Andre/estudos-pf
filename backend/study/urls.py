@@ -1,3 +1,14 @@
 from django.urls import path
-from .views import AnswerView,CompleteView,NoteView,StateView
-urlpatterns=[path("state/",StateView.as_view()),path("answer/",AnswerView.as_view()),path("complete-module/",CompleteView.as_view()),path("notes/<str:module_id>/",NoteView.as_view())]
+from .views import AnswerView,CompleteView,ContentProgressView,DailyQuickCheckView,NoteView,ResumeView,ReviewItemsView,ReviewMasteredView,RoadmapView,StateView
+urlpatterns=[
+    path("state/",StateView.as_view()),
+    path("answer/",AnswerView.as_view()),
+    path("complete-module/",CompleteView.as_view()),
+    path("notes/<str:module_id>/",NoteView.as_view()),
+    path("courses/<str:course_id>/daily-check/",DailyQuickCheckView.as_view()),
+    path("review/",ReviewItemsView.as_view()),
+    path("review/<int:item_id>/mastered/",ReviewMasteredView.as_view()),
+    path("courses/<str:course_id>/content/<int:content_id>/progress/",ContentProgressView.as_view()),
+    path("courses/<str:course_id>/resume/",ResumeView.as_view()),
+    path("roadmap/",RoadmapView.as_view()),
+]
