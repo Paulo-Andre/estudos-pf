@@ -25,6 +25,7 @@ jobs:
       DATABASE_URL: mysql://root:root@127.0.0.1:3307/estudos_pf_node
       ROOT_INITIAL_PASSWORD: CI-Root-Password-2026!
       JWT_SECRET: ci-cookie-secret-long-enough-for-tests
+      MERCADO_PAGO_ACCESS_TOKEN: TEST-ci-placeholder
       MERCADO_PAGO_WEBHOOK_SECRET: ci-mercado-pago-webhook-secret
       RESEND_API_KEY: re_ci_placeholder_only
       RESEND_FROM_EMAIL: Núcleo Concursos <onboarding@resend.dev>
