@@ -1,3 +1,9 @@
+import io
+import uuid
+from pathlib import Path
+from django.core.files.base import ContentFile
+from django.core.files.storage import default_storage
+from PIL import Image,UnidentifiedImageError
 from django.shortcuts import get_object_or_404
 from rest_framework import permissions,status
 from rest_framework.response import Response
@@ -84,3 +90,28 @@ class AdminCompetitionSettingsView(APIView):
         g,_=CompetitionMonthlyGoal.objects.get_or_create(pk=1)
         return Response({"pointsPerCorrect":s.points_per_correct,"pointsPerWrong":s.points_per_wrong,"questionsPerRound":s.questions_per_round,"isActive":s.is_active,
             "monthlyGoal":{"targetPoints":g.target_points,"targetCompletedRounds":g.target_completed_rounds,"rewardTitle":g.reward_title,"rewardDescription":g.reward_description,"isActive":g.is_active}})
+
+
+class AdminImageUploadView(APIView):
+    permission_classes=[permissions.IsAdminUser]
+    MAX_BYTES=4*1024*1024
+    ALLOWED={"image/jpeg":".jpg","image/png":".png","image/webp":".webp"}
+
+    def post(self,request):
+        uploaded=request.FILES.get("file")
+        if not uploaded:
+            return Response({"detail":"Arquivo não enviado."},status=400)
+        if uploaded.size>self.MAX_BYTES:
+            return Response({"detail":"A imagem deve ter no máximo 4 MB."},status=400)
+        content_type=(uploaded.content_type or "").lower()
+        if content_type not in self.ALLOWED:
+            return Response({"detail":"Use uma imagem JPEG, PNG ou WebP."},status=400)
+        raw=uploaded.read()
+        try:
+            image=Image.open(io.BytesIO(raw))
+            image.verify()
+        except (UnidentifiedImageError,OSError):
+            return Response({"detail":"Arquivo de imagem inválido."},status=400)
+        key="uploads/%s/%s%s"%(request.user.id,uuid.uuid4().hex,self.ALLOWED[content_type])
+        saved=default_storage.save(key,ContentFile(raw))
+        return Response({"key":saved,"url":request.build_absolute_uri(default_storage.url(saved))},status=201)
