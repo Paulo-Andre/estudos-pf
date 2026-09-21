@@ -1,0 +1,1 @@
+ALTER TABLE `commercePlans` MODIFY COLUMN `coverImageUrlsJson` varchar(4096) NOT NULL DEFAULT '[]';

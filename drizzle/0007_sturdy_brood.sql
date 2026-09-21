@@ -1,0 +1,1 @@
+ALTER TABLE `contents` ADD `coverImageUrl` varchar(2048);
