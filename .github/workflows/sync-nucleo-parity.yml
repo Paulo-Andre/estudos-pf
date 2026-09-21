@@ -1,0 +1,50 @@
+name: Sync nucleo feature parity
+
+on:
+  push:
+    branches:
+      - codex/django-migration-foundation
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    if: github.event.head_commit.message != 'chore: sync nucleo feature parity'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: codex/django-migration-foundation
+          fetch-depth: 0
+      - name: Fetch reference application
+        run: git clone --depth 1 https://github.com/Paulo-Andre/nucleo-concursos.git /tmp/nucleo
+      - name: Sync feature-complete application while preserving Django
+        shell: bash
+        run: |
+          set -euo pipefail
+          rsync -a --delete /tmp/nucleo/client/ client/
+          rsync -a --delete /tmp/nucleo/server/ server/
+          rsync -a --delete /tmp/nucleo/drizzle/ drizzle/
+          rsync -a --delete /tmp/nucleo/shared/ shared/
+          rsync -a --delete /tmp/nucleo/scripts/ scripts/
+          cp /tmp/nucleo/package.json package.json
+          cp /tmp/nucleo/pnpm-lock.yaml pnpm-lock.yaml
+          cp /tmp/nucleo/vite.config.ts vite.config.ts
+          cp /tmp/nucleo/vitest.config.ts vitest.config.ts
+          cp /tmp/nucleo/tsconfig.json tsconfig.json
+          cp /tmp/nucleo/components.json components.json
+          rm -rf client/node_modules node_modules
+      - name: Commit parity snapshot
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet; then
+            echo "No parity changes needed."
+            exit 0
+          fi
+          git config user.name "OpenAI Codex Migration"
+          git config user.email "actions@users.noreply.github.com"
+          git add client server drizzle shared scripts package.json pnpm-lock.yaml vite.config.ts vitest.config.ts tsconfig.json components.json
+          git commit -m "chore: sync nucleo feature parity"
+          git push origin HEAD:codex/django-migration-foundation
