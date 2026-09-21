@@ -11,10 +11,11 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from .cpf import is_valid_cpf,normalize_cpf
 from .email import send_password_reset
-from .models import AccountProfile
+from .models import AccountPreferences,AccountProfile,SecurityEvent
 from .rate_limit import allowed,clear_success,keys,record_failure
 from .serializers import LoginSerializer,RegisterSerializer,SafeUserSerializer,USERNAME_RE
-from .services import consume_password_reset,create_password_reset,delete_user_sessions
+from .pii import get_profile_cpf,lookup_hash,set_profile_cpf
+from .services import consume_password_reset,create_password_reset,delete_user_sessions,list_user_sessions,record_security_event,revoke_tracked_session,touch_current_session,track_current_session
 
 class CsrfView(APIView):
     permission_classes=[permissions.AllowAny];authentication_classes=[]
@@ -22,13 +23,16 @@ class CsrfView(APIView):
 
 class MeView(APIView):
     permission_classes=[permissions.AllowAny]
-    def get(self,request):return Response(SafeUserSerializer(request.user).data if request.user.is_authenticated else None)
+    def get(self,request):
+        if request.user.is_authenticated:touch_current_session(request)
+        return Response(SafeUserSerializer(request.user).data if request.user.is_authenticated else None)
 
 @method_decorator(csrf_protect,name="dispatch")
 class RegisterView(APIView):
     permission_classes=[permissions.AllowAny];authentication_classes=[]
     def post(self,request):
-        s=RegisterSerializer(data=request.data);s.is_valid(raise_exception=True);user=s.save();delete_user_sessions(user.id);login(request,user)
+        s=RegisterSerializer(data=request.data);s.is_valid(raise_exception=True);user=s.save();login(request,user)
+        track_current_session(request,user);record_security_event(request,"register_success",user)
         return Response(SafeUserSerializer(user).data,status=status.HTTP_201_CREATED)
 
 @method_decorator(csrf_protect,name="dispatch")
@@ -40,14 +44,19 @@ class LoginView(APIView):
         if not allowed(pair):return Response({"detail":"Muitas tentativas de acesso."},status=429)
         user=authenticate(request,username=s.validated_data["identifier"],password=s.validated_data["password"])
         if not user:
-            record_failure(pair);return Response({"detail":"Usuário ou senha inválidos."},status=401)
-        clear_success(pair);delete_user_sessions(user.id)
+            record_failure(pair);record_security_event(request,"login_failed",metadata={"identifierHash":lookup_hash(s.validated_data["identifier"].strip().lower())})
+            return Response({"detail":"Usuário ou senha inválidos."},status=401)
+        clear_success(pair)
         profile,_=AccountProfile.objects.get_or_create(user=user,defaults={"display_name":user.get_full_name() or user.username})
         profile.last_signed_in=timezone.now();profile.save()
-        login(request,user);return Response(SafeUserSerializer(user).data)
+        login(request,user);track_current_session(request,user);record_security_event(request,"login_success",user)
+        return Response(SafeUserSerializer(user).data)
 
 class LogoutView(APIView):
-    def post(self,request):logout(request);return Response({"success":True})
+    def post(self,request):
+        record_security_event(request,"logout",request.user)
+        logout(request)
+        return Response({"success":True})
 
 class ProfileView(APIView):
     @transaction.atomic
@@ -57,7 +66,7 @@ class ProfileView(APIView):
         name=str(request.data.get("name") or profile.display_name or user.username).strip()
         username=str(request.data.get("username") or user.username).strip().lower()
         email=str(request.data.get("email") or user.email or "").strip().lower()
-        cpf=normalize_cpf(request.data.get("cpf") or "") if "cpf" in request.data else profile.cpf
+        cpf=normalize_cpf(request.data.get("cpf") or "") if "cpf" in request.data else get_profile_cpf(profile)
         if len(name)<3:return Response({"detail":"Informe o nome completo."},status=400)
         if not USERNAME_RE.fullmatch(username):return Response({"detail":"Usuário inválido."},status=400)
         User=get_user_model()
@@ -65,10 +74,12 @@ class ProfileView(APIView):
         if email and User.objects.filter(email__iexact=email).exclude(pk=user.id).exists():return Response({"detail":"Este e-mail já está em uso."},status=409)
         if cpf:
             if not is_valid_cpf(cpf):return Response({"detail":"CPF inválido."},status=400)
-            if AccountProfile.objects.filter(cpf=cpf).exclude(pk=profile.pk).exists():return Response({"detail":"Este CPF já está em uso."},status=409)
+            digest=lookup_hash(cpf)
+            if AccountProfile.objects.filter(cpf_hash=digest).exclude(pk=profile.pk).exists() or AccountProfile.objects.filter(cpf=cpf).exclude(pk=profile.pk).exists():return Response({"detail":"Este CPF já está em uso."},status=409)
         user.username=username;user.email=email;user.first_name=name[:150]
         user.save(update_fields=["username","email","first_name"])
-        profile.display_name=name;profile.cpf=cpf or None;profile.save()
+        profile.display_name=name;set_profile_cpf(profile,cpf or None);profile.save()
+        record_security_event(request,"profile_changed",user)
         return Response(SafeUserSerializer(user).data)
 
 class ChangePasswordView(APIView):
@@ -83,7 +94,7 @@ class ChangePasswordView(APIView):
         request.user.set_password(new);request.user.save(update_fields=["password"])
         profile,_=AccountProfile.objects.get_or_create(user=request.user,defaults={"display_name":request.user.get_full_name() or request.user.username})
         profile.legacy_password_hash="";profile.save(update_fields=["legacy_password_hash","updated_at"])
-        delete_user_sessions(request.user.id);login(request,request.user)
+        delete_user_sessions(request.user.id);login(request,request.user);track_current_session(request,request.user);record_security_event(request,"password_changed",request.user)
         return Response({"success":True})
 
 class PasswordResetRequestView(APIView):
@@ -97,6 +108,7 @@ class PasswordResetRequestView(APIView):
             origin=os.getenv("PUBLIC_APP_URL","").rstrip("/") or request.build_absolute_uri("/").rstrip("/")
             try:send_password_reset(user.email,user.get_full_name() or user.username,origin+"/?reset="+raw)
             except RuntimeError:pass
+            record_security_event(request,"password_reset_requested",user)
         return Response({"success":True})
 
 class PasswordResetConfirmView(APIView):
@@ -108,8 +120,9 @@ class PasswordResetConfirmView(APIView):
         if password!=confirmation:return Response({"detail":"A confirmação de senha não confere."},status=400)
         try:validate_password(password)
         except Exception as exc:return Response({"detail":" ".join(getattr(exc,"messages",[str(exc)]))},status=400)
-        try:consume_password_reset(token,password)
+        try:user=consume_password_reset(token,password)
         except ValueError as exc:return Response({"detail":str(exc)},status=400)
+        record_security_event(request,"password_reset_completed",user)
         return Response({"success":True})
 
 class DeleteAccountView(APIView):
@@ -118,5 +131,67 @@ class DeleteAccountView(APIView):
         profile=getattr(request.user,"account_profile",None)
         accepted={request.user.username.lower(),(profile.display_name if profile else request.user.first_name or "").strip().lower()}
         if confirmation not in accepted:return Response({"detail":"Confirmação de usuário inválida."},status=400)
-        user=request.user;logout(request);user.delete()
+        user=request.user;record_security_event(request,"account_deleted",user);logout(request);user.delete()
         return Response({"success":True})
+
+
+class PreferencesView(APIView):
+    def get(self,request):
+        p,_=AccountPreferences.objects.get_or_create(user=request.user)
+        return Response({"emailSecurityAlerts":p.email_security_alerts,"emailCourseUpdates":p.email_course_updates,
+            "weeklyGoalQuestions":p.weekly_goal_questions,"weeklyGoalDays":p.weekly_goal_days,
+            "examDate":p.exam_date,"reducedMotion":p.reduced_motion,"compactMode":p.compact_mode})
+    def put(self,request):
+        p,_=AccountPreferences.objects.get_or_create(user=request.user)
+        if "emailSecurityAlerts" in request.data:p.email_security_alerts=bool(request.data["emailSecurityAlerts"])
+        if "emailCourseUpdates" in request.data:p.email_course_updates=bool(request.data["emailCourseUpdates"])
+        if "weeklyGoalQuestions" in request.data:p.weekly_goal_questions=max(1,min(5000,int(request.data["weeklyGoalQuestions"])))
+        if "weeklyGoalDays" in request.data:p.weekly_goal_days=max(1,min(7,int(request.data["weeklyGoalDays"])))
+        if "examDate" in request.data:p.exam_date=request.data["examDate"] or None
+        if "reducedMotion" in request.data:p.reduced_motion=bool(request.data["reducedMotion"])
+        if "compactMode" in request.data:p.compact_mode=bool(request.data["compactMode"])
+        p.save();record_security_event(request,"preferences_changed",request.user)
+        return self.get(request)
+
+class SessionsView(APIView):
+    def get(self,request):
+        touch_current_session(request)
+        return Response(list_user_sessions(request.user,request.session.session_key))
+
+class SessionRevokeView(APIView):
+    def delete(self,request,session_id):
+        current=[s for s in list_user_sessions(request.user,request.session.session_key) if s["id"]==str(session_id)]
+        if not current:return Response({"detail":"Sessão não encontrada."},status=404)
+        is_current=current[0]["current"]
+        if not revoke_tracked_session(request.user,session_id):return Response({"detail":"Sessão não encontrada."},status=404)
+        record_security_event(request,"session_revoked",request.user,{"current":is_current})
+        if is_current:logout(request)
+        return Response({"success":True,"current":is_current})
+
+class MySecurityEventsView(APIView):
+    def get(self,request):
+        rows=SecurityEvent.objects.filter(user=request.user)[:50]
+        return Response([{"id":e.id,"type":e.event_type,"userAgent":e.user_agent,"createdAt":e.created_at,"metadata":e.metadata} for e in rows])
+
+class DataExportView(APIView):
+    def get(self,request):
+        from courses.models import CourseEnrollment
+        from commerce.models import CommerceOrder
+        from study.models import CompletedModule,SimulationRecord,StudyAnswer,StudyNote,StudyProfile,StudyReviewItem,StudyRoadmapItem
+        profile=getattr(request.user,"account_profile",None)
+        study=StudyProfile.objects.filter(user=request.user).first()
+        payload={
+            "account":SafeUserSerializer(request.user).data,
+            "preferences":PreferencesView().get(request).data,
+            "enrollments":[{"courseId":x.course_id,"status":x.status,"startAt":x.start_at,"expiresAt":x.expires_at} for x in CourseEnrollment.objects.filter(user=request.user)],
+            "studyProfile":{"xp":study.xp,"lastStudyDate":study.last_study_date,"studyDates":study.study_dates} if study else None,
+            "completedModules":[{"moduleId":x.module_id,"completedAt":x.completed_at} for x in CompletedModule.objects.filter(user=request.user)],
+            "answers":[{"questionId":x.question_id,"correct":x.correct,"answeredAt":x.answered_at} for x in StudyAnswer.objects.filter(user=request.user).order_by("-answered_at")[:10000]],
+            "notes":[{"moduleId":x.module_id,"content":x.content} for x in StudyNote.objects.filter(user=request.user)],
+            "reviewItems":[{"questionKey":x.question_key,"status":x.status,"snapshot":x.snapshot_json} for x in StudyReviewItem.objects.filter(user=request.user)],
+            "roadmap":[{"courseId":x.course_id,"contentId":x.content_id,"weekday":x.weekday,"startTime":x.start_time,"isActive":x.is_active} for x in StudyRoadmapItem.objects.filter(user=request.user)],
+            "simulations":[{"id":x.id,"completedAt":x.completed_at,"total":x.total,"correct":x.correct,"errors":x.errors} for x in SimulationRecord.objects.filter(user=request.user).order_by("-completed_at")],
+            "orders":[{"id":x.id,"planId":x.plan_id,"status":x.status,"totalCents":x.total_cents,"currency":x.currency,"createdAt":x.created_at} for x in CommerceOrder.objects.filter(user=request.user).order_by("-created_at")],
+        }
+        record_security_event(request,"data_exported",request.user)
+        return Response(payload)
