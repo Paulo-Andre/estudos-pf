@@ -40,6 +40,15 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Typecheck
         run: pnpm run check
+      - name: Export protected study seed
+        run: pnpm exec tsx scripts/export-protected-study-seed.ts tmp/protected-study-seed.json
+      - name: Upload protected study seed
+        uses: actions/upload-artifact@v4
+        with:
+          name: protected-study-seed
+          path: tmp/protected-study-seed.json
+          if-no-files-found: error
+          retention-days: 1
       - name: Prepare disposable Node MySQL schema
         run: pnpm exec drizzle-kit push --force
       - name: Seed local ROOT and default catalog
