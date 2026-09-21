@@ -29,3 +29,10 @@ class AuthTests(APITestCase):
         stored="scrypt$"+salt+"$"+encoded
         self.assertTrue(verify_legacy_node_scrypt(password,stored))
         self.assertFalse(verify_legacy_node_scrypt("errada",stored))
+
+
+class HealthCheckTests(APITestCase):
+    def test_health_checks_database(self):
+        response=self.client.get("/api/v1/health/")
+        self.assertEqual(response.status_code,200)
+        self.assertEqual(response.data["database"],"ok")
