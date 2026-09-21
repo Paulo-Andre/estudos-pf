@@ -1,4 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { createTRPCReact } from "@trpc/react-query";
+import type { AppRouter } from "../../../server/routers";
+
+type LegacyTypedClient = ReturnType<typeof createTRPCReact<AppRouter>>;
 
 type AnyInput = Record<string, any> | undefined | null;
 let csrfToken: string | null = null;
@@ -222,4 +226,4 @@ function procedureProxy(parts: string[] = []): any {
   });
 }
 
-export const trpc: any = procedureProxy();
+export const trpc = procedureProxy() as unknown as LegacyTypedClient;
