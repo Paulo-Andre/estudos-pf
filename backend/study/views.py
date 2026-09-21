@@ -4,11 +4,11 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from courses.models import Course
-from courses.permissions import HasStudyAccess
+from courses.permissions import HasContestAccess,HasStudyAccess
 from knowledge.models import Content,Discipline
 from .advanced_services import daily_quick_check,dismiss_daily_quick_check,mark_content_opened,mark_review_mastered,queue_review,resume_content
 from .models import StudyNote,StudyReviewItem,StudyRoadmapItem
-from .services import answer,complete,state
+from .services import answer,complete,simulation_detail,state,submit_simulation
 
 class StateView(APIView):
     permission_classes=[HasStudyAccess]
@@ -43,6 +43,7 @@ class DailyQuickCheckView(APIView):
         return Response({"success":True})
 
 class ReviewItemsView(APIView):
+    permission_classes=[HasContestAccess]
     def get(self,request):
         qs=StudyReviewItem.objects.filter(user=request.user).order_by("status","-created_at")
         return Response([{"id":x.id,"questionKey":x.question_key,"snapshot":x.snapshot_json,"status":x.status,"reviewedAt":x.reviewed_at} for x in qs])
@@ -51,6 +52,7 @@ class ReviewItemsView(APIView):
         return Response({"id":item.id,"status":item.status},status=201)
 
 class ReviewMasteredView(APIView):
+    permission_classes=[HasContestAccess]
     def post(self,request,item_id):
         try:item=mark_review_mastered(request.user,item_id)
         except StudyReviewItem.DoesNotExist:return Response({"detail":"Item não encontrado."},status=404)
@@ -82,3 +84,16 @@ class RoadmapView(APIView):
         hour,minute=[int(x) for x in raw.split(":",1)]
         item,_=StudyRoadmapItem.objects.update_or_create(user=request.user,course=course,discipline=discipline,defaults={"content":content,"weekday":int(request.data.get("weekday",0)),"start_time":time(hour,minute),"is_active":True})
         return Response({"id":item.id},status=201)
+
+
+class SubmitSimulationView(APIView):
+    permission_classes=[HasContestAccess]
+    def post(self,request):
+        try:return Response(submit_simulation(request.user,request.data))
+        except ValueError as exc:return Response({"detail":str(exc)},status=400)
+
+class SimulationDetailView(APIView):
+    permission_classes=[HasContestAccess]
+    def get(self,request,simulation_id):
+        result=simulation_detail(request.user,simulation_id)
+        return Response(result) if result else Response({"detail":"Simulado não encontrado."},status=404)
