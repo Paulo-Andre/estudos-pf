@@ -31,7 +31,10 @@ class MeView(APIView):
 class RegisterView(APIView):
     permission_classes=[permissions.AllowAny];authentication_classes=[]
     def post(self,request):
-        s=RegisterSerializer(data=request.data);s.is_valid(raise_exception=True);user=s.save();login(request,user)
+        limiter=keys(request,str(request.data.get("email") or request.data.get("username") or ""),"register")
+        if not allowed(limiter,10,5):return Response({"detail":"Muitas tentativas de cadastro. Tente novamente mais tarde."},status=429)
+        record_failure(limiter)
+        s=RegisterSerializer(data=request.data);s.is_valid(raise_exception=True);user=s.save();clear_success(limiter);login(request,user)
         track_current_session(request,user);record_security_event(request,"register_success",user)
         return Response(SafeUserSerializer(user).data,status=status.HTTP_201_CREATED)
 
@@ -101,6 +104,9 @@ class PasswordResetRequestView(APIView):
     permission_classes=[permissions.AllowAny];authentication_classes=[]
     def post(self,request):
         identifier=str(request.data.get("identifier") or request.data.get("email") or "").strip()
+        limiter=keys(request,identifier,"password-reset")
+        if not allowed(limiter,10,5):return Response({"success":True})
+        record_failure(limiter)
         User=get_user_model()
         user=User.objects.filter(email__iexact=identifier).first() or User.objects.filter(username__iexact=identifier).first()
         if user and user.email:

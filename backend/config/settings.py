@@ -44,7 +44,7 @@ INSTALLED_APPS = [
     "knowledge","platformapp","commerce",
 ]
 MIDDLEWARE = [
-    "django.middleware.security.SecurityMiddleware","whitenoise.middleware.WhiteNoiseMiddleware",
+    "django.middleware.security.SecurityMiddleware","config.middleware.SecurityHeadersMiddleware","whitenoise.middleware.WhiteNoiseMiddleware",
     "corsheaders.middleware.CorsMiddleware","django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware","django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware","django.contrib.messages.middleware.MessageMiddleware",
@@ -64,6 +64,15 @@ if not DATABASE_URL:
     DATABASE_URL="mysql://root@127.0.0.1:3306/estudos_pf"
 DATABASES={"default":dj_database_url.parse(DATABASE_URL,conn_max_age=60,conn_health_checks=True)}
 DATABASES["default"].setdefault("OPTIONS",{})["charset"]="utf8mb4"
+DATABASES["default"]["OPTIONS"].setdefault("init_command","SET sql_mode='STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION'")
+DB_SSL_MODE=os.getenv("DB_SSL_MODE","").strip().upper()
+if DB_SSL_MODE:
+    if DB_SSL_MODE not in {"REQUIRED","VERIFY_CA","VERIFY_IDENTITY"}:
+        raise ImproperlyConfigured("DB_SSL_MODE inválido.")
+    DATABASES["default"]["OPTIONS"]["ssl_mode"]=DB_SSL_MODE
+DB_SSL_CA=os.getenv("DB_SSL_CA","").strip()
+if DB_SSL_CA:
+    DATABASES["default"]["OPTIONS"]["ssl"]={"ca":DB_SSL_CA}
 
 AUTHENTICATION_BACKENDS=["accounts.auth_backend.IdentifierBackend"]
 AUTH_PASSWORD_VALIDATORS=[

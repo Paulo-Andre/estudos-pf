@@ -7,6 +7,7 @@ from django.db import connection, transaction
 from django.utils import timezone
 
 from accounts.models import AccountProfile
+from accounts.pii import set_profile_cpf
 from audit.models import AdminAuditLog
 from commerce.models import (
     CommerceCoupon,
@@ -176,6 +177,9 @@ class Command(BaseCommand):
                         "last_signed_in": aware(row.get("lastSignedIn")),
                     },
                 )
+                if row.get("cpf"):
+                    set_profile_cpf(profile,str(row.get("cpf")))
+                    profile.save(update_fields=["cpf","cpf_encrypted","cpf_hash","updated_at"])
                 # Nunca substitui uma senha Django já migrada por um hash legado.
                 if not user.has_usable_password() and not profile.legacy_password_hash:
                     profile.legacy_password_hash = row.get("passwordHash") or ""

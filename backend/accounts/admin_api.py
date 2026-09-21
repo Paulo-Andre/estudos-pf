@@ -172,7 +172,7 @@ class AdminUnlockLoginView(APIView):
         identifiers=[user.username.lower()]
         if user.email:identifiers.append(user.email.lower())
         query=Q()
-        for ident in identifiers:query|=Q(key__contains=":"+ident)
+        for ident in identifiers:query|=Q(key__contains=lookup_hash("rate-ident:"+ident))
         removed,_=LoginAttempt.objects.filter(query).delete()
         audit(request.user,user,"DESBLOQUEIO_DE_LOGIN",f"Contadores de tentativa removidos: {removed}.")
         return Response({"success":True,"removed":removed})
