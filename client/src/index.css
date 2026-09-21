@@ -98,7 +98,8 @@
 
 @layer base {
   * { @apply border-border outline-ring/50; }
-  html, body, #root { max-width: 100%; min-height: 100%; overflow-x: clip; }
+  html, body, #root { max-width: 100%; overflow-x: clip; }
+  html, body, #root { min-height: 100%; }
   #root { min-height: 100dvh; }
   img, svg, video, canvas { max-width: 100%; }
   input, select, textarea, button { max-width: 100%; }
