@@ -1,6 +1,10 @@
 import os
+from pathlib import Path
 import dj_database_url
 from django.core.exceptions import ImproperlyConfigured
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+PROJECT_ROOT = BASE_DIR.parent
 
 def env_bool(name, default=False):
     return os.getenv(name, "1" if default else "0").strip().lower() in {"1","true","yes","on"}
@@ -16,8 +20,16 @@ if not SECRET_KEY:
     SECRET_KEY = "dev-only-estudos-pf-secret"
 
 ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1")
+if os.getenv("RENDER_EXTERNAL_HOSTNAME"):
+    ALLOWED_HOSTS.append(os.getenv("RENDER_EXTERNAL_HOSTNAME"))
+PUBLIC_APP_URL=os.getenv("PUBLIC_APP_URL","").strip().rstrip("/")
 CSRF_TRUSTED_ORIGINS = env_list("DJANGO_CSRF_TRUSTED_ORIGINS")
 CORS_ALLOWED_ORIGINS = env_list("DJANGO_CORS_ALLOWED_ORIGINS")
+if PUBLIC_APP_URL.startswith(("http://","https://")):
+    if PUBLIC_APP_URL not in CSRF_TRUSTED_ORIGINS:
+        CSRF_TRUSTED_ORIGINS.append(PUBLIC_APP_URL)
+    if PUBLIC_APP_URL not in CORS_ALLOWED_ORIGINS:
+        CORS_ALLOWED_ORIGINS.append(PUBLIC_APP_URL)
 CORS_ALLOW_CREDENTIALS = True
 
 INSTALLED_APPS = [
@@ -40,7 +52,12 @@ TEMPLATES=[{"BACKEND":"django.template.backends.django.DjangoTemplates","DIRS":[
     "django.template.context_processors.request","django.contrib.auth.context_processors.auth","django.contrib.messages.context_processors.messages"
 ]}}]
 
-DATABASES={"default":dj_database_url.parse(os.getenv("DATABASE_URL","mysql://root@127.0.0.1:3306/estudos_pf"),conn_max_age=60,conn_health_checks=True)}
+DATABASE_URL=os.getenv("DATABASE_URL","").strip()
+if not DATABASE_URL:
+    if not DEBUG:
+        raise ImproperlyConfigured("DATABASE_URL is required when DEBUG=False")
+    DATABASE_URL="mysql://root@127.0.0.1:3306/estudos_pf"
+DATABASES={"default":dj_database_url.parse(DATABASE_URL,conn_max_age=60,conn_health_checks=True)}
 DATABASES["default"].setdefault("OPTIONS",{})["charset"]="utf8mb4"
 
 AUTHENTICATION_BACKENDS=["accounts.auth_backend.IdentifierBackend"]
@@ -59,10 +76,12 @@ LANGUAGE_CODE="pt-br"
 TIME_ZONE="America/Sao_Paulo"
 USE_I18N=True
 USE_TZ=True
-STATIC_URL="/static/"
-STATIC_ROOT="staticfiles"
+STATIC_URL="/"
+STATIC_ROOT=BASE_DIR/"staticfiles"
+FRONTEND_DIST=PROJECT_ROOT/"dist"/"public"
+STATICFILES_DIRS=[FRONTEND_DIST] if FRONTEND_DIST.exists() else []
 MEDIA_URL="/media/"
-MEDIA_ROOT="media"
+MEDIA_ROOT=BASE_DIR/"media"
 S3_BUCKET=os.getenv("S3_BUCKET","").strip()
 S3_ENDPOINT_URL=os.getenv("S3_ENDPOINT_URL","").strip()
 S3_ACCESS_KEY=os.getenv("S3_ACCESS_KEY","").strip()
@@ -85,6 +104,8 @@ if S3_BUCKET and S3_ENDPOINT_URL and S3_ACCESS_KEY and S3_SECRET_KEY:
         default_storage_options["custom_domain"]=S3_PUBLIC_BASE_URL.replace("https://","").replace("http://","")
     DEFAULT_STORAGE={"BACKEND":"storages.backends.s3.S3Storage","OPTIONS":default_storage_options}
 else:
+    if not DEBUG and env_bool("REQUIRE_PERSISTENT_STORAGE",False):
+        raise ImproperlyConfigured("Persistent S3-compatible storage is required in production.")
     DEFAULT_STORAGE={"BACKEND":"django.core.files.storage.FileSystemStorage"}
 
 STORAGES={
@@ -105,3 +126,8 @@ if TRUST_PROXY_HEADERS:
 X_FRAME_OPTIONS="DENY"
 SECURE_CONTENT_TYPE_NOSNIFF=True
 SECURE_REFERRER_POLICY="strict-origin-when-cross-origin"
+
+SECURE_SSL_REDIRECT=env_bool("DJANGO_SECURE_SSL_REDIRECT",False)
+SECURE_HSTS_SECONDS=int(os.getenv("DJANGO_SECURE_HSTS_SECONDS","0"))
+SECURE_HSTS_INCLUDE_SUBDOMAINS=env_bool("DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS",False)
+SECURE_HSTS_PRELOAD=env_bool("DJANGO_SECURE_HSTS_PRELOAD",False)

@@ -1,9 +1,19 @@
 from django.contrib import admin
-from django.http import JsonResponse
-from django.urls import include, path
+from pathlib import Path
+from django.conf import settings
+from django.http import FileResponse, HttpResponseNotFound, JsonResponse
+from django.urls import include, path, re_path
 
 def health(_request):
     return JsonResponse({"ok": True, "service": "estudos-pf-django"})
+
+def spa_index(_request):
+    index_path=Path(settings.FRONTEND_DIST)/"index.html"
+    if not index_path.exists():
+        return HttpResponseNotFound("Frontend build not found.")
+    response=FileResponse(index_path.open("rb"),content_type="text/html; charset=utf-8")
+    response["Cache-Control"]="no-cache, no-store, must-revalidate"
+    return response
 
 urlpatterns = [
     path("admin/", admin.site.urls),
@@ -16,4 +26,5 @@ urlpatterns = [
     path("api/v1/knowledge/", include("knowledge.urls")),
     path("api/v1/platform/", include("platformapp.urls")),
     path("api/v1/commerce/", include("commerce.urls")),
+    re_path(r"^(?!api/|admin/).*$", spa_index),
 ]
