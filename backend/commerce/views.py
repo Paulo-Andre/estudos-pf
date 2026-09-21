@@ -204,3 +204,21 @@ class AdminCancelOrderView(APIView):
         order.status="cancelled";order.cancelled_at=timezone.now();order.save()
         CommerceTransaction.objects.filter(order=order,status="pending").update(status="cancelled",processed_at=timezone.now())
         return Response(order_json(order))
+
+
+class CreateOrderView(APIView):
+    def post(self,request):
+        try:order=create_order(request.user,str(request.data.get("planId") or ""),str(request.data.get("couponCode") or ""))
+        except (CommercePlan.DoesNotExist,CommerceCoupon.DoesNotExist,ValueError) as exc:return Response({"detail":str(exc)},status=400)
+        return Response(order_json(order),status=201)
+
+class CheckoutOrderView(APIView):
+    def post(self,request,order_id):
+        order=CommerceOrder.objects.filter(pk=order_id,user=request.user).first()
+        if not order:return Response({"detail":"Pedido não encontrado."},status=404)
+        if order.status=="paid":return Response({"orderId":order.id,"paid":True})
+        if order.status!="pending_payment":return Response({"detail":"Este pedido não está disponível para pagamento."},status=400)
+        origin=os.getenv("PUBLIC_APP_URL","").rstrip("/") or request.build_absolute_uri("/").rstrip("/")
+        notification=origin+"/api/v1/commerce/mercado-pago/webhook/"
+        try:return Response(create_checkout(order,origin,notification),status=201)
+        except RuntimeError as exc:return Response({"detail":str(exc),"orderId":order.id},status=502)

@@ -15,6 +15,7 @@ class SafeUserSerializer(serializers.Serializer):
     role=serializers.SerializerMethodField()
     isBlocked=serializers.SerializerMethodField()
     createdAt=serializers.DateTimeField(source="date_joined",read_only=True)
+    lastSignedIn=serializers.SerializerMethodField()
     def get_name(self,u):
         try:return u.account_profile.display_name
         except AccountProfile.DoesNotExist:return u.get_full_name() or u.username
@@ -25,6 +26,9 @@ class SafeUserSerializer(serializers.Serializer):
     def get_isBlocked(self,u):
         try:return u.account_profile.is_blocked
         except AccountProfile.DoesNotExist:return False
+    def get_lastSignedIn(self,u):
+        try:return u.account_profile.last_signed_in
+        except AccountProfile.DoesNotExist:return u.last_login
 
 class RegisterSerializer(serializers.Serializer):
     name=serializers.CharField(min_length=3,max_length=160)
