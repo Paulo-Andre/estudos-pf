@@ -1,5 +1,6 @@
 from datetime import date
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from courses.models import Course
@@ -63,7 +64,11 @@ class StudyQuestionsView(APIView):
 class ReviewItemsView(APIView):
     permission_classes=[HasContestAccess]
     def get(self,request):
-        qs=StudyReviewItem.objects.filter(user=request.user,status=request.query_params.get("status") or "pending").order_by("due_at","created_at")
+        qs=StudyReviewItem.objects.filter(user=request.user,status=request.query_params.get("status") or "pending")
+        if str(request.query_params.get("dueOnly") or "").lower() in {"1","true","yes"}:
+            from django.db.models import Q
+            qs=qs.filter(Q(due_at__isnull=True)|Q(due_at__lte=timezone.now()))
+        qs=qs.order_by("due_at","created_at")
         return Response([{"id":x.id,"questionKey":x.question_key,"snapshot":x.snapshot_json,"status":x.status,"createdAt":x.created_at,"reviewedAt":x.reviewed_at,
             "source":x.source,"dueAt":x.due_at,"intervalDays":x.interval_days,"repetitions":x.repetitions,"lapseCount":x.lapse_count,"lastRating":x.last_rating} for x in qs])
     def post(self,request):
