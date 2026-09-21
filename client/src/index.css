@@ -98,6 +98,9 @@
 
 @layer base {
   * { @apply border-border outline-ring/50; }
+  html, body, #root { max-width: 100%; overflow-x: clip; }
+  img, svg, video, canvas { max-width: 100%; }
+  input, select, textarea, button { max-width: 100%; }
   body {
     @apply bg-background text-foreground;
     font-family: "DM Sans", sans-serif;
@@ -111,7 +114,7 @@
   .container { width: 100%; margin-left: auto; margin-right: auto; padding-left: 1rem; padding-right: 1rem; }
   .flex { min-height: 0; min-width: 0; }
   .font-display { font-family: "Sora", sans-serif; }
-  .shell-card { @apply rounded-[0.65rem] border border-[#d3cbbc] bg-card shadow-[0_10px_25px_-28px_rgba(17,36,48,0.72)]; }
+  .shell-card { @apply min-w-0 rounded-[0.65rem] border border-[#d3cbbc] bg-card shadow-[0_10px_25px_-28px_rgba(17,36,48,0.72)]; }
   .eyebrow { @apply text-[10px] font-bold uppercase tracking-[0.2em] text-[#0e5a70]; }
   .nav-item { @apply flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-[#c6d7dc] transition duration-150 hover:bg-white/10 hover:text-white; }
   .nav-item-active { @apply bg-[#0e5a70] text-white shadow-[inset_3px_0_0_#8ad2c3]; }
@@ -119,6 +122,15 @@
   .ghost-button { @apply inline-flex items-center justify-center gap-2 rounded-xl border border-[#c9c1b2] bg-[#fffdf8] px-4 py-2.5 text-sm font-bold text-[#264351] transition duration-150 hover:border-[#0e5a70] hover:text-[#0e5a70] active:scale-[0.97]; }
   .dossier-rule { @apply h-px bg-gradient-to-r from-[#0e5a70] via-[#c8c0b1] to-transparent; }
   .record-code { @apply border border-[#b8d2cf] bg-[#edf5f2] px-2 py-1 text-[10px] font-bold tracking-[0.14em] text-[#0e5a70]; }
+  /* Painéis ROOT legados trazem uma casca `fixed`. Dentro do centro de comando,
+     ela deve ficar restrita à área de conteúdo para não esconder as abas. */
+  .root-management-embedded > .fixed { position: absolute !important; inset: 0 !important; z-index: 0 !important; display: block; padding: 0; background: transparent; backdrop-filter: none; }
+  .root-management-embedded > .fixed > section { width: 100% !important; max-width: none; height: 100% !important; max-height: none; border: 0; border-radius: 0; box-shadow: none; }
+  @media (max-width: 639px) {
+    [role="dialog"] > header { gap: 0.75rem; padding: 1rem; }
+    [role="dialog"] > header > :first-child { min-width: 0; }
+    [role="dialog"] > header h2, [role="dialog"] > header p { overflow-wrap: anywhere; }
+  }
   @media (min-width: 640px) { .container { padding-left: 1.5rem; padding-right: 1.5rem; } }
   @media (min-width: 1024px) { .container { padding-left: 2rem; padding-right: 2rem; max-width: 1280px; } }
 }

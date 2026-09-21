@@ -26,6 +26,10 @@ describe("catálogo de vídeos curados", () => {
     for (const url of Object.values(expectedUrls)) {
       expect(curationRecord).toContain(url);
     }
+
+    expect(curationRecord).toContain("Responsável pela curadoria");
+    expect(curationRecord).toContain("Última revisão de disponibilidade e metadados");
+    expect(curationRecord).toContain("análise pedagógica quadro a quadro");
   });
 
   it("mantém a contagem de itens oficiais de todas as disciplinas da trilha", () => {
