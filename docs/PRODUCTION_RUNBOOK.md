@@ -133,3 +133,15 @@ Depois de um período de estabilidade:
 - remover código morto e arquivos de conteúdo legado do branch principal;
 - manter backup e testes de restauração;
 - aumentar HSTS gradualmente depois de confirmar domínio/subdomínios.
+
+
+## 9. Segurança de dados e credenciais
+
+- Gere `PII_MASTER_KEY` aleatória e independente de `DJANGO_SECRET_KEY`; preserve-a em um gerenciador de segredos.
+- Nunca altere `PII_MASTER_KEY` diretamente em produção: os CPFs já cifrados dependem dela.
+- Use um usuário MySQL exclusivo para a aplicação, sem privilégios administrativos globais.
+- Prefira TLS do banco com `DB_SSL_MODE=VERIFY_IDENTITY` e CA fornecida pelo provedor quando disponível.
+- Ative MFA na conta ROOT e nas demais contas administrativas.
+- Rode `python manage.py protect_pii --strict` após importar dados legados.
+- Rode `python manage.py purge_security_data` periodicamente.
+- O backup lógico é sanitizado; snapshots completos do banco devem ficar criptografados e com acesso restrito.

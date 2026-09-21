@@ -36,8 +36,8 @@ class RegisterSerializer(serializers.Serializer):
     username=serializers.CharField(min_length=3,max_length=48)
     email=serializers.EmailField(max_length=320)
     cpf=serializers.CharField(required=False,allow_blank=True,max_length=18)
-    password=serializers.CharField(min_length=8,max_length=128,write_only=True)
-    passwordConfirmation=serializers.CharField(min_length=8,max_length=128,write_only=True)
+    password=serializers.CharField(min_length=12,max_length=128,write_only=True)
+    passwordConfirmation=serializers.CharField(min_length=12,max_length=128,write_only=True)
     def validate_username(self,v):
         v=v.strip().lower()
         if not USERNAME_RE.fullmatch(v):raise serializers.ValidationError("Usuário inválido.")

@@ -161,3 +161,15 @@ O backend Node só deve ser removido depois que:
 7. backup e rollback estiverem prontos.
 
 Veja `docs/PRODUCTION_RUNBOOK.md`.
+
+
+## Segurança adicional
+
+- `PII_MASTER_KEY` é obrigatória em produção e cifra CPF com AES-GCM. Guarde essa chave fora do banco e não a altere sem um plano de recriptografia.
+- Novas senhas e redefinições exigem no mínimo 12 caracteres.
+- MFA/TOTP é opcional para usuários e fortemente recomendado para administradores.
+- Sessões são identificadas apenas por hash e podem ser revogadas por dispositivo.
+- IPs e identificadores usados em rate limit/eventos são persistidos somente como hashes HMAC.
+- O MySQL pode exigir TLS com `DB_SSL_MODE=REQUIRED` ou `VERIFY_IDENTITY`.
+- O backup lógico é sanitizado. Para disaster recovery integral, mantenha também snapshot criptografado do banco no provedor.
+- Execute periodicamente `python manage.py purge_security_data` para aplicar a retenção dos metadados de segurança.
