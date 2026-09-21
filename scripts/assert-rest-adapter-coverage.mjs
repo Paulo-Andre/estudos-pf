@@ -19,7 +19,10 @@ const used=new Set();
 
 for (const path of await walk("client/src")) {
   if (path===adapterPath) continue;
-  const source=await readFile(path,"utf8");
+  const raw=await readFile(path,"utf8");
+  const source=raw
+    .replace(/\/\*[\s\S]*?\*\//g,"")
+    .replace(/(^|\s)\/\/.*$/gm,"$1");
   const regex=/trpc((?:\.[A-Za-z_][A-Za-z0-9_]*){1,8})\.(useQuery|useMutation)/g;
   let match;
   while ((match=regex.exec(source))) used.add(match[1].slice(1));

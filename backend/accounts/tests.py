@@ -1,3 +1,4 @@
+import json
 import base64
 import hashlib
 
@@ -35,4 +36,4 @@ class HealthCheckTests(APITestCase):
     def test_health_checks_database(self):
         response=self.client.get("/api/v1/health/")
         self.assertEqual(response.status_code,200)
-        self.assertEqual(response.data["database"],"ok")
+        self.assertEqual(json.loads(response.content)["database"],"ok")
