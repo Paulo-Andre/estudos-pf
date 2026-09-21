@@ -7,7 +7,7 @@ from courses.permissions import HasContestAccess,HasStudyAccess
 from knowledge.models import Content,Discipline,Question
 from knowledge.services import can_use_question,question_payload
 from .advanced_services import course_progress_payload,daily_quick_check,dismiss_daily_quick_check,mark_content_opened,mark_review_mastered,queue_review,remove_review_item,remove_roadmap_item,resume_content,roadmap_payload,save_roadmap_item
-from .models import StudyNote,StudyReviewItem,StudyRoadmapItem
+from .models import StudyBookmark,StudyNote,StudyReviewItem,StudyRoadmapItem
 from .services import answer,complete,simulation_detail,state,submit_simulation
 
 class StateView(APIView):
@@ -117,3 +117,42 @@ class SimulationDetailView(APIView):
     permission_classes=[HasContestAccess]
     def get(self,request,simulation_id):
         result=simulation_detail(request.user,simulation_id);return Response(result) if result else Response({"detail":"Simulado não encontrado."},status=404)
+
+
+class BookmarkListView(APIView):
+    permission_classes=[HasStudyAccess]
+    def get(self,request):
+        qs=StudyBookmark.objects.filter(user=request.user).select_related("course","content").order_by("-created_at")
+        return Response([{"id":x.id,"courseId":x.course_id,"contentId":x.content_id,"title":x.content.title,
+            "note":x.note,"createdAt":x.created_at} for x in qs])
+    def post(self,request):
+        course=get_object_or_404(Course,pk=request.data.get("courseId"))
+        content=get_object_or_404(Content,pk=request.data.get("contentId"))
+        try:course_progress_payload(request.user,course)
+        except PermissionError as exc:return Response({"detail":str(exc)},status=403)
+        if not content.discipline_links.filter(discipline__course_links__course=course).exists():
+            return Response({"detail":"Este conteúdo não pertence ao curso informado."},status=400)
+        item,_=StudyBookmark.objects.update_or_create(user=request.user,course=course,content=content,
+            defaults={"note":str(request.data.get("note") or "")[:240]})
+        return Response({"id":item.id,"courseId":course.id,"contentId":content.id,"title":content.title,"note":item.note,"createdAt":item.created_at},status=201)
+
+class BookmarkDetailView(APIView):
+    permission_classes=[HasStudyAccess]
+    def delete(self,request,item_id):
+        deleted,_=StudyBookmark.objects.filter(pk=item_id,user=request.user).delete()
+        if not deleted:return Response({"detail":"Favorito não encontrado."},status=404)
+        return Response({"success":True})
+
+class WeeklyGoalView(APIView):
+    permission_classes=[HasStudyAccess]
+    def get(self,request):
+        from datetime import timedelta
+        from accounts.models import AccountPreferences
+        from .models import StudyAnswer,StudyProfile
+        today=date.today();start=today-timedelta(days=today.weekday())
+        p,_=AccountPreferences.objects.get_or_create(user=request.user)
+        answered=StudyAnswer.objects.filter(user=request.user,answered_at__date__gte=start).count()
+        profile=StudyProfile.objects.filter(user=request.user).first()
+        days=len({d for d in (profile.study_dates if profile else []) if str(d)>=start.isoformat()})
+        return Response({"weekStart":start.isoformat(),"questions":{"target":p.weekly_goal_questions,"current":answered},
+            "days":{"target":p.weekly_goal_days,"current":days},"examDate":p.exam_date})

@@ -92,3 +92,14 @@ class StudyRoadmapItem(models.Model):
             models.CheckConstraint(condition=models.Q(weekday__gte=0,weekday__lte=6),name="roadmap_weekday_valid"),
         ]
         indexes=[models.Index(fields=["user","weekday","start_time"],name="roadmap_user_day_time_idx")]
+
+
+class StudyBookmark(models.Model):
+    user=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.CASCADE,related_name="study_bookmarks")
+    course=models.ForeignKey("courses.Course",on_delete=models.CASCADE,related_name="bookmarks")
+    content=models.ForeignKey("knowledge.Content",on_delete=models.CASCADE,related_name="bookmarks")
+    note=models.CharField(max_length=240,blank=True,default="")
+    created_at=models.DateTimeField(auto_now_add=True)
+    class Meta:
+        constraints=[models.UniqueConstraint(fields=["user","course","content"],name="bookmark_user_course_content_uniq")]
+        indexes=[models.Index(fields=["user","-created_at"],name="bookmark_user_created_idx")]

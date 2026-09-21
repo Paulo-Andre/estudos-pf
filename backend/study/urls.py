@@ -1,9 +1,9 @@
 from django.urls import path
 from .views import (
-    AnswerView,CompleteView,ContentProgressView,CourseProgressView,DailyQuickCheckView,
+    AnswerView,BookmarkDetailView,BookmarkListView,CompleteView,ContentProgressView,CourseProgressView,DailyQuickCheckView,
     NoteView,ResumeView,ReviewDeleteView,ReviewItemsView,ReviewMasteredView,
     RoadmapDeleteView,RoadmapView,SimulationDetailView,StateView,StudyQuestionsView,
-    SubmitSimulationView,
+    SubmitSimulationView,WeeklyGoalView,
 )
 urlpatterns=[
     path("state/",StateView.as_view()),
@@ -22,4 +22,7 @@ urlpatterns=[
     path("courses/<str:course_id>/resume/",ResumeView.as_view()),
     path("roadmap/",RoadmapView.as_view()),
     path("roadmap/<int:item_id>/",RoadmapDeleteView.as_view()),
+    path("bookmarks/",BookmarkListView.as_view()),
+    path("bookmarks/<int:item_id>/",BookmarkDetailView.as_view()),
+    path("weekly-goal/",WeeklyGoalView.as_view()),
 ]
