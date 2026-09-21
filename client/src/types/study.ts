@@ -14,7 +14,8 @@ export type StudyQuestion = {
 };
 
 export type InteractiveLesson = {
-  challenge: { prompt: string; options: string[]; correct: number; feedback: string };
+  teach: [string, string, string];
+  challenge: { prompt: string; options: [string, string]; correct: number; feedback: string };
   recall: { prompt: string; answer: string };
 };
 
