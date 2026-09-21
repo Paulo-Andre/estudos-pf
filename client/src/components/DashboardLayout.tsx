@@ -60,7 +60,7 @@ export default function DashboardLayout({
           <div className="flex w-full max-w-md flex-col items-center gap-6 p-8 text-center">
             <h1 className="text-2xl font-semibold tracking-tight">Entre para continuar</h1>
             <p className="max-w-sm text-sm text-muted-foreground">
-              Esta área exige uma conta cadastrada na plataforma Estudos PF.
+              Esta área exige uma conta cadastrada na plataforma Núcleo Concursos.
             </p>
             <a
               href="/"
