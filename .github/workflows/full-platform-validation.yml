@@ -61,6 +61,8 @@ jobs:
           --exclude server/commerce.integration.test.ts
       - name: Production build
         run: pnpm run build
+      - name: Assert protected content is absent from browser bundle
+        run: node scripts/assert-no-protected-content-in-build.mjs
 
   django:
     runs-on: ubuntu-latest
@@ -105,3 +107,56 @@ jobs:
       - name: Tests
         working-directory: backend
         run: python manage.py test --verbosity 2
+
+  protected-data-migration:
+    needs: node-platform
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: estudos_pf_migration
+        ports:
+          - 3308:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -proot"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+    env:
+      DEBUG: "1"
+      DJANGO_SECRET_KEY: ci-migration-secret-key
+      DATABASE_URL: mysql://root:root@127.0.0.1:3308/estudos_pf_migration
+      DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - uses: actions/download-artifact@v4
+        with:
+          name: protected-study-seed
+          path: tmp
+      - name: Install Django dependencies
+        run: python -m pip install --upgrade pip && pip install -r backend/requirements.txt
+      - name: Apply migrations
+        working-directory: backend
+        run: python manage.py migrate --noinput
+      - name: Create migration administrator without a usable password
+        working-directory: backend
+        run: python manage.py shell -c "from django.contrib.auth import get_user_model; U=get_user_model(); u,_=U.objects.get_or_create(username='ci-root',defaults={'email':'ci-root@example.invalid','is_staff':True,'is_superuser':True}); u.set_unusable_password(); u.save()"
+      - name: Dry-run protected data import
+        working-directory: backend
+        run: python manage.py import_protected_study_seed ../tmp/protected-study-seed.json --admin-username ci-root --dry-run
+      - name: Import protected data
+        working-directory: backend
+        run: python manage.py import_protected_study_seed ../tmp/protected-study-seed.json --admin-username ci-root
+      - name: Re-run import to prove idempotency
+        working-directory: backend
+        run: python manage.py import_protected_study_seed ../tmp/protected-study-seed.json --admin-username ci-root
+      - name: Assert imported protected catalog
+        working-directory: backend
+        run: python manage.py shell -c "from courses.models import CourseContent; from knowledge.models import Question; assert CourseContent.objects.filter(is_published=True).exists(); assert Question.objects.filter(legacy_key__isnull=False).exists(); print('Protected data migration verified')"
