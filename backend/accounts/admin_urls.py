@@ -1,5 +1,5 @@
 from django.urls import path
-from .admin_api import AdminBlockUserView,AdminResetPasswordView,AdminSecurityEventsView,AdminSecurityOverviewView,AdminStatsView,AdminUnlockLoginView,AdminUserDetailView,AdminUserListView,AdminUserSessionDetailView,AdminUserSessionsView
+from .admin_api import AdminBlockUserView,AdminResetPasswordView,AdminResetMFAView,AdminSecurityEventsView,AdminSecurityOverviewView,AdminStatsView,AdminUnlockLoginView,AdminUserDetailView,AdminUserListView,AdminUserSessionDetailView,AdminUserSessionsView
 
 urlpatterns=[
     path("users/",AdminUserListView.as_view()),
@@ -12,4 +12,5 @@ urlpatterns=[
     path("users/<int:user_id>/sessions/",AdminUserSessionsView.as_view()),
     path("users/<int:user_id>/sessions/<uuid:session_id>/",AdminUserSessionDetailView.as_view()),
     path("users/<int:user_id>/unlock-login/",AdminUnlockLoginView.as_view()),
+    path("users/<int:user_id>/reset-mfa/",AdminResetMFAView.as_view()),
 ]

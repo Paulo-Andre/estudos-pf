@@ -5,6 +5,7 @@ from .cpf import is_valid_cpf
 from .models import AccountProfile,LoginAttempt,SecurityEvent,TrackedSession
 from .pii import get_profile_cpf
 from .rate_limit import keys
+from .mfa import begin_setup,confirm_setup
 from .services import consume_password_reset,create_password_reset
 
 class AccountSecurityTests(TestCase):
@@ -32,7 +33,7 @@ class AccountSecurityTests(TestCase):
         self.assertIsNone(profile.cpf)
         self.assertNotIn("52998224725",profile.cpf_encrypted)
         self.assertEqual(get_profile_cpf(profile),"52998224725")
-        self.assertEqual(response.data["cpf"],"52998224725")
+        self.assertEqual(response.data["user"]["cpf"],"52998224725")
 
     def test_session_can_be_listed_and_revoked(self):
         client=APIClient()
@@ -65,6 +66,23 @@ class AccountSecurityTests(TestCase):
         self.assertIn("Content-Security-Policy",response)
         self.assertEqual(response["X-Frame-Options"],"DENY")
         self.assertEqual(response["Cross-Origin-Resource-Policy"],"same-origin")
+
+    def test_mfa_requires_second_factor_and_backup_code_is_single_use(self):
+        import pyotp
+        User=get_user_model()
+        user=User.objects.create_user("mfa-user","mfa@example.com","Senha-F0rte!2026")
+        setup=begin_setup(user,"Senha-F0rte!2026")
+        code=pyotp.TOTP(setup["secret"]).now()
+        backup=confirm_setup(user,code)[0]
+        client=APIClient()
+        challenge=client.post("/api/v1/auth/login/",{"identifier":"mfa-user","password":"Senha-F0rte!2026"},format="json")
+        self.assertEqual(challenge.status_code,428)
+        self.assertTrue(challenge.data["mfaRequired"])
+        ok=client.post("/api/v1/auth/login/",{"identifier":"mfa-user","password":"Senha-F0rte!2026","otp":backup},format="json")
+        self.assertEqual(ok.status_code,200)
+        client.post("/api/v1/auth/logout/",{},format="json")
+        reused=client.post("/api/v1/auth/login/",{"identifier":"mfa-user","password":"Senha-F0rte!2026","otp":backup},format="json")
+        self.assertEqual(reused.status_code,401)
 
     def test_admin_security_overview_requires_admin(self):
         User=get_user_model()

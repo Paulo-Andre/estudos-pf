@@ -217,7 +217,9 @@ class MFAStatusView(APIView):
 
 class MFASetupView(APIView):
     def post(self,request):
-        data=begin_setup(request.user);record_security_event(request,"mfa_setup_started",request.user)
+        try:data=begin_setup(request.user,request.data.get("password"))
+        except ValueError as exc:return Response({"detail":str(exc)},status=403)
+        record_security_event(request,"mfa_setup_started",request.user)
         return Response(data)
 
 class MFAConfirmView(APIView):

@@ -17,7 +17,8 @@ class AuthTests(APITestCase):
         }
         response=self.client.post("/api/v1/auth/register/",payload,format="json")
         self.assertEqual(response.status_code,201)
-        self.assertEqual(response.data["username"],"aluno.teste")
+        self.assertEqual(response.data["user"]["username"],"aluno.teste")
+        self.assertFalse(response.data["hadActiveSession"])
         me=self.client.get("/api/v1/auth/me/")
         self.assertEqual(me.status_code,200)
         self.assertEqual(me.data["username"],"aluno.teste")

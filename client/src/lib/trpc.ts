@@ -190,6 +190,7 @@ async function mutationProcedure(path: string, input: any) {
     case "admin.revokeUserSessions": return api("/api/v1/admin/users/" + id(input.userId) + "/sessions/", { method: "DELETE" });
     case "admin.revokeUserSession": return api("/api/v1/admin/users/" + id(input.userId) + "/sessions/" + id(input.sessionId) + "/", { method: "DELETE" });
     case "admin.unlockUserLogin": return api("/api/v1/admin/users/" + id(input.userId) + "/unlock-login/", json("POST", {}));
+    case "admin.resetUserMfa": return api("/api/v1/admin/users/" + id(input.userId) + "/reset-mfa/", json("POST", {}));
     case "admin.alerts.create": return api("/api/v1/platform/admin/alerts/", json("POST", input));
     case "admin.alerts.setActive": return api("/api/v1/platform/admin/alerts/" + id(input.alertId) + "/", json("POST", { isActive: input.isActive }));
     case "admin.contacts.save": return api("/api/v1/platform/admin/settings/", json("PUT", { contact: input }));

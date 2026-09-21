@@ -13,6 +13,7 @@ from study.models import StudyAnswer,SimulationRecord
 from .cpf import is_valid_cpf,normalize_cpf
 from .models import AccountMFA,AccountProfile,LoginAttempt,PasswordResetToken,SecurityEvent,TrackedSession
 from .serializers import SafeUserSerializer
+from .mfa import reset_for_user
 from .pii import lookup_hash,set_profile_cpf
 from .services import delete_user_sessions,list_user_sessions,record_security_event,revoke_tracked_session
 
@@ -178,3 +179,15 @@ class AdminUnlockLoginView(APIView):
         removed,_=LoginAttempt.objects.filter(query).delete()
         audit(request.user,user,"DESBLOQUEIO_DE_LOGIN",f"Contadores de tentativa removidos: {removed}.")
         return Response({"success":True,"removed":removed})
+
+
+class AdminResetMFAView(APIView):
+    permission_classes=[permissions.IsAdminUser]
+    def post(self,request,user_id):
+        user=get_user_model().objects.filter(pk=user_id).first()
+        if not user:return Response({"detail":"Conta não encontrada."},status=404)
+        reset_for_user(user)
+        delete_user_sessions(user.id)
+        audit(request.user,user,"REDEFINICAO_MFA","MFA removido e sessões encerradas pelo administrador para recuperação da conta.")
+        record_security_event(request,"admin_mfa_reset",user,{"actorUserId":request.user.id})
+        return Response({"success":True})

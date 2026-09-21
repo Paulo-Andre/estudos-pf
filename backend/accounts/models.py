@@ -82,5 +82,6 @@ class AccountMFA(models.Model):
     secret_encrypted=models.TextField(blank=True,default="")
     enabled=models.BooleanField(default=False)
     backup_code_hashes=models.JSONField(default=list,blank=True)
+    last_totp_step=models.BigIntegerField(null=True,blank=True)
     confirmed_at=models.DateTimeField(null=True,blank=True)
     updated_at=models.DateTimeField(auto_now=True)
