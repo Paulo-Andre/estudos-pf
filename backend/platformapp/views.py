@@ -10,7 +10,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from courses.models import Course
 from .models import CompetitionMonthlyGoal,CompetitionSettings,GlobalContactSettings,PlatformAlert,PlatformGeneralSettings
-from .services import answer_competition_round,dismiss_alert,ranking,start_competition_round,visible_alerts
+from .services import answer_competition_round,clear_competition_ranking,competition_round_payload,dismiss_alert,monthly_goal_status,my_competition_history,my_competition_score,ranking,start_competition_round,visible_alerts
 
 def alert_json(a):
     return {"id":a.id,"level":a.level,"title":a.title,"categoryLabel":a.category_label,"message":a.message,"audience":a.audience,"courseId":a.course_id,"createdAt":a.created_at}
@@ -115,3 +115,54 @@ class AdminImageUploadView(APIView):
         key="uploads/%s/%s%s"%(request.user.id,uuid.uuid4().hex,self.ALLOWED[content_type])
         saved=default_storage.save(key,ContentFile(raw))
         return Response({"key":saved,"url":request.build_absolute_uri(default_storage.url(saved))},status=201)
+
+
+class CompetitionSettingsView(APIView):
+    def get(self,request):
+        s,_=CompetitionSettings.objects.get_or_create(pk=1)
+        return Response({"pointsPerCorrect":s.points_per_correct,"pointsPerWrong":s.points_per_wrong,"questionsPerRound":s.questions_per_round,"isActive":s.is_active})
+
+class CompetitionCoursesView(APIView):
+    def get(self,request):
+        qs=Course.objects.filter(course_type="concurso",is_active=True)
+        return Response([{"id":c.id,"title":c.title,"track":c.track} for c in qs])
+
+class CompetitionMyScoreView(APIView):
+    def get(self,request):
+        return Response(my_competition_score(request.user,request.query_params.get("courseId")))
+
+class CompetitionHistoryView(APIView):
+    def get(self,request):
+        return Response(my_competition_history(request.user,request.query_params.get("courseId")))
+
+class CompetitionMonthlyGoalView(APIView):
+    def get(self,request):
+        return Response(monthly_goal_status(request.user,request.query_params.get("courseId")))
+
+class CompetitionRoundView(APIView):
+    def get(self,request,round_id):
+        payload=competition_round_payload(request.user,round_id)
+        return Response(payload) if payload else Response({"detail":"Rodada não encontrada."},status=404)
+
+class AdminCompetitionSaveView(APIView):
+    permission_classes=[permissions.IsAdminUser]
+    def put(self,request):
+        s,_=CompetitionSettings.objects.get_or_create(pk=1)
+        for src,dst in {"pointsPerCorrect":"points_per_correct","pointsPerWrong":"points_per_wrong","questionsPerRound":"questions_per_round","isActive":"is_active"}.items():
+            if src in request.data:setattr(s,dst,request.data[src])
+        s.updated_by=request.user;s.save()
+        goal_data=request.data.get("monthlyGoal")
+        if isinstance(goal_data,dict):
+            g,_=CompetitionMonthlyGoal.objects.get_or_create(pk=1)
+            for src,dst in {"targetPoints":"target_points","targetCompletedRounds":"target_completed_rounds","rewardTitle":"reward_title","rewardDescription":"reward_description","isActive":"is_active"}.items():
+                if src in goal_data:setattr(g,dst,goal_data[src])
+            g.updated_by=request.user;g.save()
+        return Response({"success":True})
+
+class AdminCompetitionClearView(APIView):
+    permission_classes=[permissions.IsAdminUser]
+    def post(self,request):
+        if str(request.data.get("confirmation") or "")!="LIMPAR RANKING":
+            return Response({"detail":"Confirmação inválida."},status=400)
+        count=clear_competition_ranking(request.user,request.data.get("courseId") or None)
+        return Response({"success":True,"deletedRounds":count})
