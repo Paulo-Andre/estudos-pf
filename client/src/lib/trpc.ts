@@ -3,6 +3,11 @@ import { createTRPCReact } from "@trpc/react-query";
 import type { AppRouter } from "../../../server/routers";
 
 type LegacyTypedClient = ReturnType<typeof createTRPCReact<AppRouter>>;
+type ExtendedTypedClient = Omit<LegacyTypedClient,"auth"|"admin"|"study"> & {
+  auth: LegacyTypedClient["auth"] & { [key: string]: any };
+  admin: LegacyTypedClient["admin"] & { [key: string]: any };
+  study: LegacyTypedClient["study"] & { [key: string]: any };
+};
 
 type AnyInput = Record<string, any> | undefined | null;
 let csrfToken: string | null = null;
@@ -71,6 +76,11 @@ function id(v: any) { return encodeURIComponent(String(v)); }
 async function queryProcedure(path: string, input: any) {
   switch (path) {
     case "auth.me": return api("/api/v1/auth/me/");
+    case "auth.preferences": return api("/api/v1/auth/preferences/");
+    case "auth.sessions": return api("/api/v1/auth/sessions/");
+    case "auth.securityEvents": return api("/api/v1/auth/security-events/");
+    case "study.bookmarks": return api("/api/v1/study/bookmarks/");
+    case "study.weeklyGoal": return api("/api/v1/study/weekly-goal/");
     case "study.state": return api("/api/v1/study/state/");
     case "study.access": return api("/api/v1/courses/access/");
     case "study.courseCatalog": return api("/api/v1/courses/");
@@ -96,6 +106,9 @@ async function queryProcedure(path: string, input: any) {
     case "platform.alerts": return api("/api/v1/platform/alerts/");
     case "admin.users": return api("/api/v1/admin/users/" + qs(input, ["search"]));
     case "admin.stats": return api("/api/v1/admin/stats/");
+    case "admin.security.overview": return api("/api/v1/admin/security/");
+    case "admin.security.events": return api("/api/v1/admin/security/events/" + qs(input, ["type"]));
+    case "admin.userSessions": return api("/api/v1/admin/users/" + id(input.userId) + "/sessions/");
     case "admin.courses": return api("/api/v1/courses/admin/");
     case "admin.auditLogs": return api("/api/v1/audit/");
     case "admin.enrollments": return api("/api/v1/courses/admin/users/" + id(input.userId) + "/enrollments/");
@@ -132,6 +145,12 @@ async function mutationProcedure(path: string, input: any) {
     case "auth.resetPassword": return api("/api/v1/auth/password-reset/confirm/", json("POST", input));
     case "auth.updateProfile": return api("/api/v1/auth/profile/", json("PUT", input));
     case "auth.changePassword": { const d = await api("/api/v1/auth/change-password/", json("POST", input)); csrfToken = null; return d; }
+    case "auth.updatePreferences": return api("/api/v1/auth/preferences/", json("PUT", input));
+    case "auth.revokeSession": return api("/api/v1/auth/sessions/" + id(input.id) + "/", { method: "DELETE" });
+    case "auth.exportData": return api("/api/v1/auth/export/");
+    case "auth.deleteAccount": return api("/api/v1/auth/delete/", json("DELETE", input));
+    case "study.bookmarks.add": return api("/api/v1/study/bookmarks/", json("POST", input));
+    case "study.bookmarks.remove": return api("/api/v1/study/bookmarks/" + id(input.id) + "/", { method: "DELETE" });
     case "study.answer": return api("/api/v1/study/answer/", json("POST", input));
     case "study.completeModule": return api("/api/v1/study/complete-module/", json("POST", input));
     case "study.dismissDailyCheck": return api("/api/v1/study/courses/" + id(input.courseId) + "/daily-check/", { method: "DELETE" });
@@ -160,6 +179,9 @@ async function mutationProcedure(path: string, input: any) {
     case "admin.resetPassword": return api("/api/v1/admin/users/" + id(input.userId) + "/reset-password/", json("POST", input));
     case "admin.setBlocked": return api("/api/v1/admin/users/" + id(input.userId) + "/block/", json("POST", { isBlocked: input.isBlocked }));
     case "admin.deleteUser": return api("/api/v1/admin/users/" + id(input.userId) + "/", json("DELETE", { confirmation: input.confirmation || input.confirmationUsername }));
+    case "admin.revokeUserSessions": return api("/api/v1/admin/users/" + id(input.userId) + "/sessions/", { method: "DELETE" });
+    case "admin.revokeUserSession": return api("/api/v1/admin/users/" + id(input.userId) + "/sessions/" + id(input.sessionId) + "/", { method: "DELETE" });
+    case "admin.unlockUserLogin": return api("/api/v1/admin/users/" + id(input.userId) + "/unlock-login/", json("POST", {}));
     case "admin.alerts.create": return api("/api/v1/platform/admin/alerts/", json("POST", input));
     case "admin.alerts.setActive": return api("/api/v1/platform/admin/alerts/" + id(input.alertId) + "/", json("POST", { isActive: input.isActive }));
     case "admin.contacts.save": return api("/api/v1/platform/admin/settings/", json("PUT", { contact: input }));
@@ -227,4 +249,4 @@ function procedureProxy(parts: string[] = []): any {
   });
 }
 
-export const trpc = procedureProxy() as unknown as LegacyTypedClient;
+export const trpc = procedureProxy() as unknown as ExtendedTypedClient;

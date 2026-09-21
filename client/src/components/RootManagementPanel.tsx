@@ -9,6 +9,7 @@ import { GlobalSettingsPanel } from "@/components/GlobalSettingsPanel";
 import { StorefrontLivePreview } from "@/components/StorefrontLivePreview";
 import { CompetitionAdminPanel } from "@/components/CompetitionAdminPanel";
 import { AlertAdminPanel } from "@/components/AlertAdminPanel";
+import { AdminSecurityPanel } from "@/components/AdminSecurityPanel";
 import { rootManagementSections, type RootManagementSection } from "@/lib/rootManagementNavigation";
 
 export type { RootManagementSection } from "@/lib/rootManagementNavigation";
@@ -64,6 +65,7 @@ export function RootManagementPanel({ activeSection, onSectionChange, onClose }:
           <div className="root-management-embedded h-full">
             {activeSection === "business" && <AdminCommercePanel embedded />}
             {activeSection === "students" && <AdminPanel embedded mode="students" />}
+            {activeSection === "security" && <AdminSecurityPanel />}
             {activeSection === "courses" && <CourseCatalogManagementPanel />}
             {activeSection === "contents" && <AdminLibraryPanel embedded />}
             {activeSection === "alerts" && <AlertAdminPanel />}
