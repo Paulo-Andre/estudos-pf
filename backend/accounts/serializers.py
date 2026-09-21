@@ -4,6 +4,7 @@ from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
 from .cpf import is_valid_cpf,normalize_cpf
 from .models import AccountProfile
+from .pii import get_profile_cpf,lookup_hash,set_profile_cpf
 USERNAME_RE=re.compile(r"^[a-z0-9._-]+$")
 
 class SafeUserSerializer(serializers.Serializer):
@@ -20,7 +21,7 @@ class SafeUserSerializer(serializers.Serializer):
         try:return u.account_profile.display_name
         except AccountProfile.DoesNotExist:return u.get_full_name() or u.username
     def get_cpf(self,u):
-        try:return u.account_profile.cpf
+        try:return get_profile_cpf(u.account_profile)
         except AccountProfile.DoesNotExist:return None
     def get_role(self,u):return "admin" if u.is_staff else "user"
     def get_isBlocked(self,u):
@@ -50,7 +51,8 @@ class RegisterSerializer(serializers.Serializer):
         if not v:return ""
         v=normalize_cpf(v)
         if not is_valid_cpf(v):raise serializers.ValidationError("CPF inválido.")
-        if AccountProfile.objects.filter(cpf=v).exists():raise serializers.ValidationError("CPF em uso.")
+        digest=lookup_hash(v)
+        if AccountProfile.objects.filter(cpf_hash=digest).exists() or AccountProfile.objects.filter(cpf=v).exists():raise serializers.ValidationError("CPF em uso.")
         return v
     def validate(self,a):
         if a["password"]!=a["passwordConfirmation"]:raise serializers.ValidationError("A confirmação de senha não confere.")
@@ -58,7 +60,9 @@ class RegisterSerializer(serializers.Serializer):
     def create(self,a):
         pwd=a.pop("password");a.pop("passwordConfirmation");name=a.pop("name");cpf=a.pop("cpf","") or None
         user=get_user_model().objects.create_user(username=a["username"],email=a["email"],password=pwd,first_name=name[:150])
-        AccountProfile.objects.create(user=user,display_name=name,cpf=cpf)
+        profile=AccountProfile(user=user,display_name=name)
+        set_profile_cpf(profile,cpf)
+        profile.save()
         return user
 
 class LoginSerializer(serializers.Serializer):
