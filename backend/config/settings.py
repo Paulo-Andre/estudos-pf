@@ -24,6 +24,7 @@ INSTALLED_APPS = [
     "django.contrib.admin","django.contrib.auth","django.contrib.contenttypes",
     "django.contrib.sessions","django.contrib.messages","django.contrib.staticfiles",
     "corsheaders","rest_framework","accounts","courses","study","audit",
+    "knowledge","platformapp","commerce",
 ]
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware","whitenoise.middleware.WhiteNoiseMiddleware",
