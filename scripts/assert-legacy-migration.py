@@ -18,6 +18,7 @@ assert AdminAuditLog.objects.filter(affected_user=user,action="CI_MIGRATION_FIXT
 authenticated=authenticate(username="legacy.student",password="Legacy-Migration-Only-2026!")
 assert authenticated and authenticated.pk == user.pk
 profile.refresh_from_db()
+user.refresh_from_db()
 assert profile.legacy_password_hash == ""
 assert user.has_usable_password()
 print("Legacy core migration verified")

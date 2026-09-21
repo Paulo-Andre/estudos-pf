@@ -84,7 +84,7 @@ try {
     [rootId,userId,"CI_MIGRATION_FIXTURE","Registro fictício para validar a migração."],
   );
 
-  console.log(JSON.stringify({ userId, rootId, password: legacyPassword }));
+  console.log(JSON.stringify({ userId, rootId, seeded: true }));
 } finally {
   await db.end();
 }
