@@ -8,7 +8,7 @@ from .advanced_services import (
     course_progress_payload,daily_quick_check,mark_content_opened,queue_review,
     remove_review_item,remove_roadmap_item,resume_content,roadmap_items,save_roadmap_item,
 )
-from .models import StudyReviewItem,StudyRoadmapItem
+from .models import StudyBookmark,StudyReviewItem,StudyRoadmapItem
 
 class AdvancedStudyTests(TestCase):
     def setUp(self):
@@ -68,3 +68,36 @@ class AdvancedStudyTests(TestCase):
         with self.assertRaises(StudyRoadmapItem.DoesNotExist):
             remove_roadmap_item(self.other,item.id)
         self.assertTrue(remove_roadmap_item(self.user,item.id))
+
+
+class StudyProductivityApiTests(TestCase):
+    def setUp(self):
+        User=get_user_model()
+        self.admin=User.objects.create_superuser("admin-productivity","admin-productivity@example.com","Admin-F0rte!2026")
+        self.user=User.objects.create_user("bookmark-user","bookmark@example.com","Aluno-F0rte!2026")
+        self.other=User.objects.create_user("bookmark-other","bookmark2@example.com","Aluno-F0rte!2026")
+        self.course=Course.objects.create(id="bookmark-course",title="Curso",created_by=self.admin)
+        CourseEnrollment.objects.create(user=self.user,course=self.course,created_by=self.admin,start_at=timezone.now()-timedelta(days=1),expires_at=timezone.now()+timedelta(days=30))
+        CourseEnrollment.objects.create(user=self.other,course=self.course,created_by=self.admin,start_at=timezone.now()-timedelta(days=1),expires_at=timezone.now()+timedelta(days=30))
+        self.discipline=Discipline.objects.create(name="Disciplina",short_name="bookmark-disc",status="published",created_by=self.admin,updated_by=self.admin)
+        CourseDiscipline.objects.create(course=self.course,discipline=self.discipline,linked_by=self.admin)
+        self.content=Content.objects.create(title="Favorito",status="published",created_by=self.admin,updated_by=self.admin)
+        DisciplineContent.objects.create(discipline=self.discipline,content=self.content,linked_by=self.admin)
+
+    def test_bookmarks_are_private_to_each_user(self):
+        client=__import__("rest_framework.test",fromlist=["APIClient"]).APIClient()
+        client.force_authenticate(self.user)
+        created=client.post("/api/v1/study/bookmarks/",{"courseId":self.course.id,"contentId":self.content.id,"note":"Revisar"},format="json")
+        self.assertEqual(created.status_code,201)
+        self.assertEqual(client.get("/api/v1/study/bookmarks/").data[0]["note"],"Revisar")
+        other=__import__("rest_framework.test",fromlist=["APIClient"]).APIClient();other.force_authenticate(self.other)
+        self.assertEqual(other.get("/api/v1/study/bookmarks/").data,[])
+        self.assertEqual(other.delete(f"/api/v1/study/bookmarks/{created.data['id']}/").status_code,404)
+        self.assertTrue(StudyBookmark.objects.filter(user=self.user).exists())
+
+    def test_weekly_goal_endpoint_returns_targets_and_progress(self):
+        client=__import__("rest_framework.test",fromlist=["APIClient"]).APIClient();client.force_authenticate(self.user)
+        response=client.get("/api/v1/study/weekly-goal/")
+        self.assertEqual(response.status_code,200)
+        self.assertEqual(response.data["questions"]["target"],50)
+        self.assertEqual(response.data["days"]["target"],5)
