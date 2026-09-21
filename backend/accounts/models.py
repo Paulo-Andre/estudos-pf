@@ -31,6 +31,11 @@ class AccountPreferences(models.Model):
     reduced_motion=models.BooleanField(default=False)
     compact_mode=models.BooleanField(default=False)
     updated_at=models.DateTimeField(auto_now=True)
+    class Meta:
+        constraints=[
+            models.CheckConstraint(condition=models.Q(weekly_goal_questions__gte=1,weekly_goal_questions__lte=5000),name="prefs_goal_questions_valid"),
+            models.CheckConstraint(condition=models.Q(weekly_goal_days__gte=1,weekly_goal_days__lte=7),name="prefs_goal_days_valid"),
+        ]
 
 class TrackedSession(models.Model):
     id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)

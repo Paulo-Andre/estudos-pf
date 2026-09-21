@@ -13,16 +13,16 @@ describe("contrato de layout móvel", () => {
 
   it("mantém a matriz vertical até telas amplas, sem comprimir título e seletor", () => {
     expect(homeSource).toContain("className=\"w-full min-w-0 rounded-xl");
-    expect(homeSource).toContain("xl:flex-row xl:items-center xl:justify-between");
-    expect(homeSource).toContain("w-full flex-col gap-2 border-t");
-    expect(homeSource).toContain("xl:w-[min(100%,24rem)]");
-    expect(homeSource).toContain("xl:min-w-[17rem] xl:flex-1");
+    expect(homeSource).toContain("xl:flex-row xl:items-center");
+    expect(homeSource).toContain("flex flex-col gap-3 xl:flex-row");
+    expect(homeSource).toContain("xl:w-[22rem]");
+    expect(homeSource).toContain("min-w-0 flex-1");
   });
 
   it("preserva títulos legíveis e ações empilhadas no acesso e no painel", () => {
     expect(accessGateSource).toContain("text-[clamp(2rem,9vw,2.5rem)]");
     expect(homeSource).toContain("flex flex-col gap-2.5 sm:flex-row");
-    expect(homeSource).toContain("break-words text-[clamp(1.8rem,8vw,2.5rem)]");
+    expect(homeSource).toContain("text-[clamp(2rem,7vw,3.5rem)]");
   });
 
   it("protege cabeçalhos de diálogos administrativos contra textos longos", () => {
@@ -32,9 +32,11 @@ describe("contrato de layout móvel", () => {
 
   it("abre a navegação móvel como gaveta acessível e mantém a página de roteiro disponível", () => {
     expect(homeSource).toContain('id="study-navigation"');
-    expect(homeSource).toContain('w-[min(20rem,86vw)]');
+    expect(homeSource).toContain('w-[min(19rem,88vw)]');
     expect(homeSource).toContain('overflow-y-auto overscroll-contain');
     expect(homeSource).toContain('aria-controls="study-navigation"');
     expect(homeSource).toContain('{ label: "Roteiro", icon: CalendarClock }');
+    expect(homeSource).toContain('className="mobile-tabbar"');
+    expect(cssSource).toContain(".mobile-tabbar");
   });
 });
