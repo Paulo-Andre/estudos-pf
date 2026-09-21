@@ -1,14 +1,39 @@
-# Plano executado — migração incremental para Django
+# Migração Node → Django
 
-Esta branch adiciona o novo backend em backend/ sem remover server/.
+## Situação atual
 
-Implementado: Django/DRF, MySQL, autenticação, compatibilidade com senha legada, rate limit persistente, cursos/matrículas, conteúdo protegido, estudo básico, auditoria e importador legado.
+A migração é incremental e mantém `server/` durante a validação.
 
-Próximas fases:
-1. testar em MySQL de homologação;
-2. importar client/src/data para tabelas Django;
-3. criar modelos de questões e importadores;
-4. criar client/src/api e trocar tRPC gradualmente;
-5. migrar imagens de /manus-storage;
-6. validar paridade total;
-7. remover Node/tRPC/Drizzle somente no final.
+Já implementado:
+
+- Django + Django REST Framework;
+- MySQL;
+- autenticação por sessão e migração do hash scrypt legado;
+- recuperação de senha e Resend;
+- rate limit persistente;
+- cursos e matrículas com relações/constraints;
+- conteúdo protegido por matrícula;
+- importação idempotente das apostilas/questões;
+- conteúdo protegido removido do bundle público;
+- banco de questões/revisão editorial;
+- progresso, roadmap, revisão, notas e simulados;
+- competição/ranking;
+- comércio, cupons, pedidos e Mercado Pago;
+- pagamento atômico/idempotente;
+- auditoria e backup;
+- alertas/configurações;
+- storage S3/R2;
+- PWA responsivo;
+- pipeline CI em MySQL descartável;
+- container Django/React de mesmo domínio.
+
+## Critérios restantes para remover Node
+
+1. container de produção validado no CI;
+2. homologação da importação com cópia do banco real;
+3. migração das imagens legadas;
+4. homologação externa Mercado Pago/Resend;
+5. cutover com backup/rollback;
+6. remover dependências Node server-side somente depois da estabilização.
+
+O processo operacional está em `docs/PRODUCTION_RUNBOOK.md`.
