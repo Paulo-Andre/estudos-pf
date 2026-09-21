@@ -1,4 +1,4 @@
-const CACHE = "nucleo-static-v1";
+const CACHE = "nucleo-static-v2";
 const STATIC = ["/", "/favicon.svg", "/manifest.webmanifest"];
 
 self.addEventListener("install", event => {
