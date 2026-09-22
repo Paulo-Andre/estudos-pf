@@ -365,33 +365,52 @@ function StudyWorkspace({ user, logout, initialView, initialCommercePlanId, onCo
     else setView("Conteúdo");
   }
 
-  function startSimulation(total: number, focusDiscipline?: string) {
+  function startSimulation(total: number, focusDiscipline?: string, focusSubject?: string, mode: SimulationMode = "practice") {
     setSimulationResult(null);
     setSimulationNotice(null);
-    const strictReviewMode = centralQuestionsQuery.data?.requiresReviewMode === true;
-    const bank = focusDiscipline ? persistentSimulationQuestions.filter(item => item.discipline === focusDiscipline) : persistentSimulationQuestions;
-    const questions = selectBalancedBooleanQuestions(bank, total, state.usedQuestionIds);
-    if (questions.length < total) {
-      setSimulationNotice(focusDiscipline ? `Há somente ${questions.length} questão(ões) disponíveis em ${focusDiscipline}. Reduza o treino focal ou publique mais questões dessa disciplina.` : strictReviewMode ? `Há somente ${questions.length} questão(ões) central(is) aprovada(s)/publicada(s) para revisão obrigatória. Publique ao menos ${total} para iniciar este simulado.` : `Há somente ${questions.length} questões disponíveis para este simulado.`);
+    if (total < 1) {
+      setSimulationNotice("Não há questões suficientes para iniciar este modo.");
       return;
     }
-    setSimulation({ questions, index: 0, answers: {}, confidences: {}, startedAt: Date.now() });
+    const strictReviewMode = centralQuestionsQuery.data?.requiresReviewMode === true;
+    const bank = persistentSimulationQuestions.filter(item => (!focusDiscipline || item.discipline === focusDiscipline) && (!focusSubject || item.subject.includes(focusSubject)));
+    const questions = selectBalancedBooleanQuestions(bank, total, state.usedQuestionIds);
+    if (questions.length < total) {
+      const focusLabel = focusSubject ? (focusDiscipline || "Tópico") + " · " + focusSubject : focusDiscipline;
+      setSimulationNotice(focusLabel ? "Há somente " + questions.length + " questão(ões) disponíveis em " + focusLabel + ". Reduza o bloco ou publique mais questões desse tópico." : strictReviewMode ? "Há somente " + questions.length + " questão(ões) central(is) aprovada(s)/publicada(s) para revisão obrigatória. Publique ao menos " + total + " para iniciar este simulado." : "Há somente " + questions.length + " questões disponíveis para este simulado.");
+      return;
+    }
+    const now = Date.now();
+    setSimulation({ questions, index: 0, answers: {}, confidences: {}, startedAt: now, questionStartedAt: now, mode, telemetry: {} });
   }
 
-  function submitSimulationAnswer(answer: boolean, confidence: number) {
+  function submitSimulationAnswer(answer: boolean, confidence: number, itemTelemetry?: { elapsedMs: number; changes: number }) {
     if (!simulation) return;
     const question = simulation.questions[simulation.index];
     const hasSelectedAnswer = Object.prototype.hasOwnProperty.call(simulation.answers, question.id);
-    const nextAnswers = hasSelectedAnswer ? simulation.answers : { ...simulation.answers, [question.id]: answer };
-    const nextConfidences = hasSelectedAnswer ? simulation.confidences : { ...simulation.confidences, [question.id]: confidence };
-    if (!hasSelectedAnswer) {
-      setSimulation({ ...simulation, answers: nextAnswers, confidences: nextConfidences });
+    const isRealExam = simulation.mode === "real_exam";
+    const nextAnswers = (!hasSelectedAnswer || isRealExam) ? { ...simulation.answers, [question.id]: answer } : simulation.answers;
+    const nextConfidences = (!hasSelectedAnswer || isRealExam) ? { ...simulation.confidences, [question.id]: confidence } : simulation.confidences;
+    const telemetryItem: SimulationTelemetryItem = simulation.telemetry[question.id] ?? {
+      questionId: question.id,
+      elapsedMs: Math.max(0, itemTelemetry?.elapsedMs ?? (Date.now() - simulation.questionStartedAt)),
+      changes: Math.max(0, itemTelemetry?.changes ?? 0),
+      confidence,
+      correct: answer === question.answer,
+      discipline: question.discipline,
+      subject: question.subject,
+    };
+    const nextTelemetry = { ...simulation.telemetry, [question.id]: telemetryItem };
+
+    if (!isRealExam && !hasSelectedAnswer) {
+      setSimulation({ ...simulation, answers: nextAnswers, confidences: nextConfidences, telemetry: nextTelemetry });
       return;
     }
     if (simulation.index < simulation.questions.length - 1) {
-      setSimulation({ ...simulation, index: simulation.index + 1, answers: nextAnswers, confidences: nextConfidences });
+      setSimulation({ ...simulation, index: simulation.index + 1, answers: nextAnswers, confidences: nextConfidences, telemetry: nextTelemetry, questionStartedAt: Date.now() });
       return;
     }
+
     const byDiscipline: SimulationRecord["byDiscipline"] = {};
     const byBlock: SimulationRecord["byBlock"] = { I: { correct: 0, total: 0 }, II: { correct: 0, total: 0 }, III: { correct: 0, total: 0 } };
     const answerRecords: AnswerRecord[] = [];
@@ -404,12 +423,42 @@ function StudyWorkspace({ user, logout, initialView, initialCommercePlanId, onCo
       if (isCorrect) byDiscipline[item.discipline].correct += 1;
       byBlock[item.block].total += 1;
       if (isCorrect) byBlock[item.block].correct += 1;
-      answerRecords.push({ questionId: item.id, correct: isCorrect, answeredAt: new Date().toISOString() });
+      answerRecords.push({ questionId: item.id, correct: isCorrect, confidence: nextConfidences[item.id] ?? null, answeredAt: new Date().toISOString() });
     });
-    const result: SimulationRecord = { id: `sim-${Date.now()}`, date: new Date().toISOString(), total: simulation.questions.length, correct, errors: simulation.questions.length - correct, elapsedSeconds: Math.round((Date.now() - simulation.startedAt) / 1000), byDiscipline, byBlock };
+
+    const telemetryQuestions = simulation.questions.map(item => nextTelemetry[item.id]).filter(Boolean) as SimulationTelemetryItem[];
+    const half = Math.max(1, Math.floor(telemetryQuestions.length / 2));
+    const firstHalf = telemetryQuestions.slice(0, half);
+    const secondHalf = telemetryQuestions.slice(half).length ? telemetryQuestions.slice(half) : firstHalf;
+    const firstHalfAccuracy = percentage(firstHalf.filter(item => item.correct).length, firstHalf.length);
+    const secondHalfAccuracy = percentage(secondHalf.filter(item => item.correct).length, secondHalf.length);
+    const slowest = telemetryQuestions.reduce<SimulationTelemetryItem | null>((current, item) => !current || item.elapsedMs > current.elapsedMs ? item : current, null);
+    const telemetrySummary = telemetryQuestions.length ? {
+      averageSeconds: Math.round((telemetryQuestions.reduce((sum, item) => sum + item.elapsedMs, 0) / telemetryQuestions.length / 1000) * 10) / 10,
+      answerChanges: telemetryQuestions.reduce((sum, item) => sum + item.changes, 0),
+      highConfidenceErrors: telemetryQuestions.filter(item => item.confidence === 3 && !item.correct).length,
+      firstHalfAccuracy,
+      secondHalfAccuracy,
+      performanceDrop: firstHalfAccuracy - secondHalfAccuracy,
+      slowestQuestion: slowest ? { questionId: slowest.questionId, seconds: Math.round((slowest.elapsedMs / 1000) * 10) / 10, subject: slowest.subject } : undefined,
+    } : {};
+
+    const result: SimulationRecord = {
+      id: "sim-" + Date.now(), date: new Date().toISOString(), courseId: effectiveContestId, mode: simulation.mode,
+      total: simulation.questions.length, correct, errors: simulation.questions.length - correct,
+      elapsedSeconds: Math.round((Date.now() - simulation.startedAt) / 1000), byDiscipline, byBlock,
+      telemetry: { questions: telemetryQuestions, summary: telemetrySummary },
+    };
     const today = new Date().toISOString().slice(0, 10);
     updateState((current) => ({ ...current, xp: current.xp + correct * 8 + 15, simulations: [...current.simulations, result], answers: [...current.answers, ...answerRecords], usedQuestionIds: Array.from(new Set([...current.usedQuestionIds, ...simulation.questions.map((item) => item.id)])), studyDates: current.studyDates.includes(today) ? current.studyDates : [...current.studyDates, today], lastStudyDate: today, weeklySimulationCorrect: current.weeklySimulationCorrect + correct }));
-    simulationMutation.mutate({ id: result.id, total: result.total, correct: result.correct, errors: result.errors, elapsedSeconds: result.elapsedSeconds, byDiscipline: result.byDiscipline, byBlock: result.byBlock, answers: answerRecords.map(answer => ({ questionId: answer.questionId, correct: answer.correct, confidence: nextConfidences[answer.questionId] ?? null })), questionIds: simulation.questions.map(item => item.id), persistentAnswers: simulation.questions.filter((item): item is SimulationQuestion & { persistentQuestionId: number } => typeof item.persistentQuestionId === "number").map(item => ({ questionId: item.persistentQuestionId, correct: nextAnswers[item.id] === item.answer, snapshot: { statement: item.statement, type: "certo_errado", answer: item.answer, explanation: item.explanation, discipline: item.discipline, subject: item.subject, difficulty: item.difficulty, source: item.source, confidence: nextConfidences[item.id] ?? null } })) } as any, { onSuccess: serverState => setState(serverState as StudyState) });
+    simulationMutation.mutate({
+      id: result.id, courseId: effectiveContestId, mode: simulation.mode, total: result.total, correct: result.correct, errors: result.errors,
+      elapsedSeconds: result.elapsedSeconds, byDiscipline: result.byDiscipline, byBlock: result.byBlock,
+      telemetry: { questions: telemetryQuestions },
+      answers: answerRecords.map(item => ({ questionId: item.questionId, correct: item.correct, confidence: item.confidence ?? null })),
+      questionIds: simulation.questions.map(item => item.id),
+      persistentAnswers: simulation.questions.filter((item): item is SimulationQuestion & { persistentQuestionId: number } => typeof item.persistentQuestionId === "number").map(item => ({ questionId: item.persistentQuestionId, correct: nextAnswers[item.id] === item.answer, snapshot: { statement: item.statement, type: "certo_errado", answer: item.answer, explanation: item.explanation, discipline: item.discipline, subject: item.subject, difficulty: item.difficulty, source: item.source, confidence: nextConfidences[item.id] ?? null } })),
+    } as any, { onSuccess: serverState => { setState(serverState as StudyState); void learningIntelligenceQuery.refetch(); void learningPlanQuery.refetch(); } });
     setSimulation(null);
     setSimulationResult(result);
   }
