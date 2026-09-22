@@ -25,6 +25,7 @@ import { CourseMarketplace } from "@/components/CourseMarketplace";
 import { RootManagementPanel, RootManagementSection } from "@/components/RootManagementPanel";
 import { GlobalContactLinks } from "@/components/GlobalContactLinks";
 import { CourseAccessRequired } from "@/components/CourseAccessRequired";
+import { IntelligenceArea, type IntelligenceTopic, type LearningIntelligence } from "@/components/IntelligenceArea";
 import { StudentAlerts } from "@/components/StudentAlerts";
 import { RichContentBody } from "@/components/RichContentBody";
 import { Textarea } from "@/components/ui/textarea";
@@ -36,7 +37,7 @@ import { isStorefrontPreviewMode } from "@/lib/storefrontPreview";
 import { resolveVisibleStudyCourseId, visibleStudyCourses } from "@/lib/studyCourseAccess";
 import { resolveStudyWorkspaceAccessState } from "@/lib/studyWorkspaceAccess";
 
-type View = "Painel" | "Conteúdo" | "Roteiro" | "Simulados" | "Competição" | "Revisar" | "Histórico" | "Cursos" | "Acessos";
+type View = "Painel" | "Inteligência" | "Conteúdo" | "Roteiro" | "Simulados" | "Competição" | "Revisar" | "Histórico" | "Cursos" | "Acessos";
 type StudyModule = DetailedStudyModule & { chapter?: ApostilaChapter };
 type RestQuestion = {
   id: number;
@@ -53,7 +54,9 @@ type RestQuestion = {
   source?: string | null;
 };
 type SimulationQuestion = StudyQuestion & { persistentQuestionId?: number };
-type ActiveSimulation = { questions: SimulationQuestion[]; index: number; answers: Record<string, boolean>; confidences: Record<string, number>; startedAt: number } | null;
+type SimulationMode = "practice" | "domain" | "real_exam";
+type SimulationTelemetryItem = { questionId: string; elapsedMs: number; changes: number; confidence: number | null; correct: boolean; discipline: string; subject: string };
+type ActiveSimulation = { questions: SimulationQuestion[]; index: number; answers: Record<string, boolean>; confidences: Record<string, number>; startedAt: number; questionStartedAt: number; mode: SimulationMode; telemetry: Record<string, SimulationTelemetryItem> } | null;
 type PersonalReviewItem = { id: number; questionKey: string; snapshot: { statement: string; answer: boolean; explanation: string; discipline: string; subject: string; source?: string }; status: "pending" | "mastered"; createdAt: string; reviewedAt: string | null; source?: string; dueAt?: string | null; intervalDays?: number; repetitions?: number; lapseCount?: number; lastRating?: "again" | "hard" | "good" | "easy" | "" };
 type LearningPlan = {
   method: { name: string; steps: { id: "learn" | "practice" | "review" | "simulate"; label: string; principle: string; status: string }[] };
@@ -71,7 +74,7 @@ type RoadmapItem = { id: number; contentId: number; disciplineId: number; discip
 type StudyCourseOption = { id: string; title: string; track: string; courseType: "concurso" | "tutorial"; description: string | null; coverImageUrl: string | null; panelLabel: string | null; panelBadge: string | null; panelTitle: string | null; panelDescription: string | null; panelCtaText: string | null; isActive: boolean };
 
 const navigation: { label: View; icon: typeof LayoutDashboard }[] = [
-  { label: "Painel", icon: LayoutDashboard }, { label: "Conteúdo", icon: BookOpen }, { label: "Roteiro", icon: CalendarClock }, { label: "Simulados", icon: Play }, { label: "Competição", icon: Trophy }, { label: "Revisar", icon: RotateCcw }, { label: "Histórico", icon: History },
+  { label: "Painel", icon: LayoutDashboard }, { label: "Inteligência", icon: BarChart3 }, { label: "Conteúdo", icon: BookOpen }, { label: "Roteiro", icon: CalendarClock }, { label: "Simulados", icon: Play }, { label: "Competição", icon: Trophy }, { label: "Revisar", icon: RotateCcw }, { label: "Histórico", icon: History },
 ];
 
 function formatTime(seconds: number) {
@@ -227,6 +230,7 @@ function StudyWorkspace({ user, logout, initialView, initialCommercePlanId, onCo
   const personalReviewsQuery = (trpc.study.review.list as any).useQuery({ dueOnly: true }, { enabled: hasConfirmedCourseAccess && !tutorialCourse, refetchOnWindowFocus: false });
   const contentProgressQuery = trpc.study.contentProgress.get.useQuery({ courseId: effectiveContestId }, { enabled: canUseActiveCourse, refetchOnWindowFocus: false });
   const learningPlanQuery = trpc.study.learningPlan.useQuery({ courseId: effectiveContestId }, { enabled: canUseActiveCourse, refetchOnWindowFocus: false });
+  const learningIntelligenceQuery = (trpc.study as any).learningIntelligence.useQuery({ courseId: effectiveContestId }, { enabled: canUseActiveCourse && !tutorialCourse, refetchOnWindowFocus: false });
   const roadmapQuery = trpc.study.roadmap.list.useQuery({ courseId: effectiveContestId }, { enabled: canUseActiveCourse, refetchOnWindowFocus: false });
   const personalCompetitionScoreQuery = trpc.competition.myScore.useQuery({}, { enabled: canUseActiveCourse && !tutorialCourse, refetchOnWindowFocus: false });
   const answerMutation = trpc.study.answer.useMutation();
