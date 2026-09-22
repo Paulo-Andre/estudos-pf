@@ -93,3 +93,12 @@ class LearningMethodologyTests(TestCase):
             "confidence":5,
         },format="json")
         self.assertEqual(response.status_code,400)
+
+
+    def test_learning_plan_builds_interleaved_session(self):
+        plan=learning_plan(self.user,self.course)
+        self.assertEqual(plan["sessionPlan"]["totalMinutes"],50)
+        self.assertEqual(plan["sessionPlan"]["intensity"],"base")
+        self.assertEqual(sum(block["minutes"] for block in plan["sessionPlan"]["blocks"]),50)
+        self.assertIn("Constitucional",plan["interleaving"]["disciplines"])
+        self.assertEqual(len(plan["sessionPlan"]["blocks"]),4)

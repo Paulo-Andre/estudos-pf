@@ -149,9 +149,42 @@ def learning_plan(user,course):
 
     metacognition=_metacognition(user)
 
+    intensity="reta_final" if exam_days is not None and 0 <= exam_days <= 30 else "acelerado" if exam_days is not None and 31 <= exam_days <= 90 else "base"
+    discipline_names=[]
+    for item in contents:
+        name=str(item.get("disciplineName") or "").strip()
+        if name and name not in discipline_names:
+            discipline_names.append(name)
+    weak_names=[row["discipline"] for row in weaknesses if row["discipline"] in discipline_names]
+    interleaving=(weak_names+[name for name in discipline_names if name not in weak_names])[:3]
+
+    if intensity=="reta_final":
+        session_blocks=[
+            {"type":"review","minutes":15,"label":"Revisão espaçada","detail":"Limpe primeiro as revisões vencidas e erros recentes."},
+            {"type":"practice","minutes":20,"label":"Questões focais","detail":"Pratique a principal fraqueza sem consultar teoria."},
+            {"type":"simulate","minutes":10,"label":"Mini diagnóstico","detail":"Misture disciplinas e meça estabilidade sob pressão."},
+            {"type":"recap","minutes":5,"label":"Fechamento","detail":"Explique em voz alta o que errou e o que mudou."},
+        ]
+    elif intensity=="acelerado":
+        session_blocks=[
+            {"type":"review","minutes":10,"label":"Revisão espaçada","detail":"Recupere da memória antes de reler."},
+            {"type":"learn","minutes":20,"label":"Conteúdo prioritário","detail":"Avance em um tópico importante com checkpoint ativo."},
+            {"type":"practice","minutes":15,"label":"Questões","detail":"Teste imediatamente o que acabou de estudar."},
+            {"type":"recap","minutes":5,"label":"Fechamento","detail":"Resuma sem consultar e registre a principal dúvida."},
+        ]
+    else:
+        session_blocks=[
+            {"type":"review","minutes":5,"label":"Aquecimento","detail":"Revise rapidamente itens vencidos."},
+            {"type":"learn","minutes":25,"label":"Aprendizagem","detail":"Estude um tópico com compreensão e recuperação ativa."},
+            {"type":"practice","minutes":15,"label":"Questões","detail":"Misture questões novas e de pontos frágeis."},
+            {"type":"recap","minutes":5,"label":"Fechamento","detail":"Faça um resumo de memória em poucas frases."},
+        ]
+
     return {
         "courseId":course.id,
         "metacognition":metacognition,
+        "interleaving":{"disciplines":interleaving,"principle":"Alterne disciplinas para melhorar discriminação e reduzir dependência de contexto."},
+        "sessionPlan":{"totalMinutes":sum(block["minutes"] for block in session_blocks),"intensity":intensity,"blocks":session_blocks},
         "method":{"name":"Ciclo de Domínio","steps":[
             {"id":"learn","label":"Aprender","principle":"Compreensão guiada","status":f"{completed}/{len(contents)} aulas"},
             {"id":"practice","label":"Praticar","principle":"Recuperação ativa","status":f"{questions_week}/{prefs.weekly_goal_questions} questões na semana"},
@@ -171,6 +204,6 @@ def learning_plan(user,course):
             "studyDaysThisWeek":days_week,
             "studyDayGoal":prefs.weekly_goal_days,
             "examDays":exam_days,
-            "intensity":"reta_final" if exam_days is not None and 0 <= exam_days <= 30 else "acelerado" if exam_days is not None and 31 <= exam_days <= 90 else "base",
+            "intensity":intensity,
         },
     }
