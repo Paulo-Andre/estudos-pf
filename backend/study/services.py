@@ -9,7 +9,7 @@ def state(user):
     p=profile(user);sims=list(SimulationRecord.objects.filter(user=user).order_by("completed_at"))
     week_start=timezone.now()-timedelta(days=7)
     return {"completedModules":[x.module_id for x in CompletedModule.objects.filter(user=user)],
-    "answers":[{"questionId":x.question_id,"correct":x.correct,"answeredAt":x.answered_at.isoformat()} for x in StudyAnswer.objects.filter(user=user).order_by("answered_at")],
+    "answers":[{"questionId":x.question_id,"correct":x.correct,"confidence":x.confidence,"answeredAt":x.answered_at.isoformat()} for x in StudyAnswer.objects.filter(user=user).order_by("answered_at")],
     "simulations":[{"id":x.id,"date":x.completed_at.isoformat(),"total":x.total,"correct":x.correct,"errors":x.errors,"elapsedSeconds":x.elapsed_seconds,"byDiscipline":x.by_discipline,"byBlock":x.by_block} for x in sims],
     "xp":p.xp,"lastStudyDate":p.last_study_date.isoformat() if p.last_study_date else None,"studyDates":p.study_dates,"usedQuestionIds":p.used_question_ids,
     "weeklySimulationCorrect":sum(x.correct for x in sims if x.completed_at>=week_start)}
