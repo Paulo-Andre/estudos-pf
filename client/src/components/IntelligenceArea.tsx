@@ -172,7 +172,25 @@ export function IntelligenceArea({
 
       {errorCoach&&<article className="shell-card p-5 sm:p-6">
         <div className="flex items-start justify-between gap-3"><div><p className="eyebrow">TREINADOR DE ERROS</p><h3 className="font-display mt-1 text-xl font-extrabold text-[#24434d]">{primary?.label??"Coletando padrão"}</h3></div><Brain className="h-6 w-6 shrink-0 text-[#0e5a70]"/></div>
-        {primary?<><p className="mt-3 text-sm leading-6 text-[#64777a]">{primary.action}</p><div className="mt-4 rounded-xl border border-[#d8e5e0] bg-[#f5faf8] p-4"><div className="flex items-center justify-between"><span className="text-xs font-bold text-[#33545d]">Sinal dominante</span><span className="font-display text-xl font-extrabold text-[#0e5a70]">{primary.share}%</span></div><div className="mt-2 h-2 overflow-hidden rounded-full bg-[#dfe9e5]"><div className="h-full rounded-full bg-[#0e5a70]" style={{width:`${primary.share}%`}}/></div></div><div className="mt-4 space-y-2">{errorCoach.patterns.slice(0,4).map(pattern=><div key={pattern.id} className="flex items-center justify-between gap-3 text-xs"><span className="font-semibold text-[#49636a]">{pattern.label}</span><span className="font-bold text-[#0e5a70]">{pattern.count} evidência(s)</span></div>)}</div></div></>:<div className="mt-4"><Empty text={`Continue respondendo com confiança registrada. O diagnóstico dominante aparece após pelo menos ${features.diagnosticMinAnswers} respostas neste curso.`}/></div>}
+        {primary ? (
+          <>
+            <p className="mt-3 text-sm leading-6 text-[#64777a]">{primary.action}</p>
+            <div className="mt-4 rounded-xl border border-[#d8e5e0] bg-[#f5faf8] p-4">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-[#33545d]">Sinal dominante</span>
+                <span className="font-display text-xl font-extrabold text-[#0e5a70]">{primary.share}%</span>
+              </div>
+              <div className="mt-2 h-2 overflow-hidden rounded-full bg-[#dfe9e5]">
+                <div className="h-full rounded-full bg-[#0e5a70]" style={{width:`${primary.share}%`}}/>
+              </div>
+              <div className="mt-4 space-y-2">
+                {errorCoach.patterns.slice(0,4).map(pattern=><div key={pattern.id} className="flex items-center justify-between gap-3 text-xs"><span className="font-semibold text-[#49636a]">{pattern.label}</span><span className="font-bold text-[#0e5a70]">{pattern.count} evidência(s)</span></div>)}
+              </div>
+            </div>
+          </>
+        ) : (
+          <div className="mt-4"><Empty text={`Continue respondendo com confiança registrada. O diagnóstico dominante aparece após pelo menos ${features.diagnosticMinAnswers} respostas neste curso.`}/></div>
+        )}
         {!!errorCoach.hotspots.length&&<div className="mt-5 border-t border-[#e3eae7] pt-4"><p className="text-[9px] font-black uppercase tracking-[.12em] text-[#78888b]">Tópicos com mais retorno necessário</p><div className="mt-2 space-y-2">{errorCoach.hotspots.slice(0,3).map(item=><div key={`${item.discipline}-${item.subject}`} className="flex items-center justify-between gap-3 rounded-lg bg-[#fafcfb] px-3 py-2 text-xs"><span className="truncate text-[#536d73]">{item.discipline} · {item.subject}</span><span className="shrink-0 font-bold text-[#a06432]">{item.errors} erro(s)</span></div>)}</div></div>}
       </article>}
     </section>}
