@@ -8,17 +8,18 @@ from django.utils import timezone
 
 from courses.permissions import has_active_enrollment
 from knowledge.models import CourseDiscipline,DisciplineContent,Question
+from knowledge.services import can_use_question
 from .models import SimulationRecord,SimulationReflection,StudyAnswer,StudyContentProgress,StudyReviewItem,StudySyllabusSnapshot
 
 
 def _course_blueprint(course):
     discipline_links=list(
-        CourseDiscipline.objects.filter(course=course,discipline__status="published")
+        CourseDiscipline.objects.filter(course=course,discipline__status__in=["approved","published"])
         .select_related("discipline").order_by("discipline__name","discipline_id")
     )
     discipline_ids=[item.discipline_id for item in discipline_links]
     contents=(
-        DisciplineContent.objects.filter(discipline_id__in=discipline_ids,content__status="published")
+        DisciplineContent.objects.filter(discipline_id__in=discipline_ids,content__status__in=["approved","published"])
         .select_related("discipline","content").order_by("discipline__name","content__title","content_id")
     )
     rows=[]
@@ -81,12 +82,13 @@ def ensure_syllabus_snapshot(course):
 
 def _question_index(course,content_ids):
     questions=(
-        Question.objects.filter(status="published",content_links__content_id__in=content_ids)
+        Question.objects.filter(content_links__content_id__in=content_ids)
         .distinct().prefetch_related("content_links")
     )
     alias_to_contents=defaultdict(set)
     question_count=defaultdict(set)
     for question in questions:
+        if not can_use_question(question):continue
         linked={link.content_id for link in question.content_links.all() if link.content_id in content_ids}
         aliases={str(question.pk),f"central-{question.pk}"}
         if question.legacy_key:aliases.add(question.legacy_key)
