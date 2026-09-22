@@ -3,7 +3,9 @@ import re
 from io import BytesIO
 
 from django.db import transaction
-from openpyxl import load_workbook
+from openpyxl import Workbook,load_workbook
+from openpyxl.styles import Alignment,Font,PatternFill
+from openpyxl.worksheet.datavalidation import DataValidation
 from pypdf import PdfReader
 
 from audit.models import AdminAuditLog
@@ -310,3 +312,82 @@ def import_summary(rows):
             "errors":item["errors"],"warnings":item["warnings"],
         })
     return {"validRows":valid,"skippedRows":skipped,"invalidRows":invalid,"preview":preview}
+
+
+def _style_template(ws,widths):
+    header_fill=PatternFill("solid",fgColor="173D49")
+    header_font=Font(color="FFFFFF",bold=True)
+    for cell in ws[1]:
+        cell.fill=header_fill;cell.font=header_font;cell.alignment=Alignment(horizontal="center",vertical="center",wrap_text=True)
+    ws.freeze_panes="A2";ws.auto_filter.ref=ws.dimensions
+    for letter,width in widths.items():ws.column_dimensions[letter].width=width
+    for row in ws.iter_rows(min_row=2):
+        for cell in row:cell.alignment=Alignment(vertical="top",wrap_text=True)
+
+
+def _list_validation(ws,column,values,start=2,end=2001):
+    quoted='"'+",".join(values)+'"'
+    dv=DataValidation(type="list",formula1=quoted,allow_blank=True)
+    ws.add_data_validation(dv);dv.add(f"{column}{start}:{column}{end}")
+
+
+def question_template_bytes():
+    wb=Workbook();ws=wb.active;ws.title="QUESTOES"
+    headers=["enunciado","tipo","alternativa_a","alternativa_b","alternativa_c","alternativa_d","alternativa_e","resposta","comentario","dificuldade","banca","ano","fonte","conteudo_ids","conteudos","status","exigir_revisao"]
+    ws.append(headers)
+    ws.append(["A Constituição Federal assegura o direito de reunião pacífica?","certo_errado","","","","","","CERTO","Exemplo de comentário didático.","intermediate","CEBRASPE",2025,"Prova exemplo","", "Direitos Fundamentais","draft","NÃO"])
+    ws.append(["Assinale a alternativa correta sobre o tema.","multipla_escolha","Alternativa um","Alternativa dois","Alternativa três","Alternativa quatro","","B","A alternativa B é a correta.","intermediate","FGV",2025,"Prova exemplo","","Direitos Fundamentais","draft","SIM"])
+    _style_template(ws,{"A":58,"B":20,"C":28,"D":28,"E":28,"F":28,"G":28,"H":18,"I":48,"J":20,"K":18,"L":10,"M":24,"N":20,"O":34,"P":18,"Q":18})
+    _list_validation(ws,"B",["certo_errado","multipla_escolha"])
+    _list_validation(ws,"J",["basic","intermediate","advanced"])
+    _list_validation(ws,"P",["draft","review","approved","published","inactive"])
+    _list_validation(ws,"Q",["SIM","NÃO"])
+    guide=wb.create_sheet("INSTRUCOES")
+    guide_rows=[
+        ["CAMPO","REGRA"],
+        ["enunciado","Obrigatório. Mínimo de 12 caracteres."],
+        ["tipo","certo_errado ou multipla_escolha."],
+        ["alternativa_a até alternativa_e","Use apenas para múltipla escolha; mínimo de 2 alternativas."],
+        ["resposta","CERTO/ERRADO ou A/B/C/D/E."],
+        ["conteudo_ids","Opcional. IDs separados por |, ; ou vírgula. É a forma mais precisa de vínculo."],
+        ["conteudos","Opcional. Títulos exatos separados por | ou ;. Use quando não souber o ID."],
+        ["status","draft, review, approved, published ou inactive."],
+        ["exigir_revisao","SIM ou NÃO."],
+        ["segurança","Não use fórmulas. O sistema rejeita planilhas com fórmulas e linhas inválidas antes de gravar."],
+    ]
+    for row in guide_rows:guide.append(row)
+    _style_template(guide,{"A":26,"B":95})
+    ref=wb.create_sheet("CONTEUDOS_ATUAIS");ref.append(["id","titulo","status"])
+    for item in Content.objects.all().order_by("title").values("id","title","status")[:5000]:ref.append([item["id"],item["title"],item["status"]])
+    _style_template(ref,{"A":12,"B":60,"C":18})
+    out=BytesIO();wb.save(out);return out.getvalue()
+
+
+def content_template_bytes():
+    wb=Workbook();ws=wb.active;ws.title="CONTEUDOS"
+    headers=["titulo","objetivo","descricao","resumo_card","corpo","disciplina_ids","disciplinas","status","exigir_revisao","aviso","capa_url","video_url","video_rotulo","material_url","material_rotulo"]
+    ws.append(headers)
+    ws.append(["Direitos Fundamentais","Compreender os principais direitos e garantias.","Resumo do conteúdo para administração.","Texto curto exibido no cartão do aluno.","Insira aqui o conteúdo completo da aula. Pode usar parágrafos e listas em texto.","","const","draft","NÃO","NENHUM","","","","",""])
+    _style_template(ws,{"A":36,"B":42,"C":48,"D":40,"E":90,"F":20,"G":28,"H":18,"I":18,"J":18,"K":34,"L":34,"M":24,"N":34,"O":24})
+    _list_validation(ws,"H",["draft","review","approved","published","inactive"])
+    _list_validation(ws,"I",["SIM","NÃO"])
+    _list_validation(ws,"J",["NENHUM","NOVO","ATUALIZADO"])
+    guide=wb.create_sheet("INSTRUCOES")
+    guide_rows=[
+        ["CAMPO","REGRA"],
+        ["titulo","Obrigatório. Conteúdos com título idêntico são ignorados para evitar duplicação."],
+        ["corpo","Texto principal da aula."],
+        ["disciplina_ids","Opcional. IDs separados por |, ; ou vírgula."],
+        ["disciplinas","Opcional. Siglas exatas das disciplinas separadas por | ou ;."],
+        ["status","draft, review, approved, published ou inactive."],
+        ["aviso","NENHUM, NOVO ou ATUALIZADO."],
+        ["exigir_revisao","SIM ou NÃO."],
+        ["PDF","Para PDF não use esta planilha: envie um PDF textual pelo painel e selecione as disciplinas antes de validar."],
+        ["segurança","Não use fórmulas. O sistema valida o arquivo inteiro antes de permitir a gravação."],
+    ]
+    for row in guide_rows:guide.append(row)
+    _style_template(guide,{"A":26,"B":95})
+    ref=wb.create_sheet("DISCIPLINAS_ATUAIS");ref.append(["id","sigla","nome","status"])
+    for item in Discipline.objects.all().order_by("name").values("id","short_name","name","status")[:5000]:ref.append([item["id"],item["short_name"],item["name"],item["status"]])
+    _style_template(ref,{"A":12,"B":20,"C":48,"D":18})
+    out=BytesIO();wb.save(out);return out.getvalue()
