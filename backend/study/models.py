@@ -25,6 +25,7 @@ class CompletedModule(models.Model):
 class StudyAnswer(models.Model):
     id=models.BigAutoField(primary_key=True)
     user=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.CASCADE,related_name="study_answers")
+    course=models.ForeignKey("courses.Course",on_delete=models.SET_NULL,null=True,blank=True,related_name="study_answers")
     question_id=models.CharField(max_length=80)
     correct=models.BooleanField()
     confidence=models.PositiveSmallIntegerField(null=True,blank=True)
@@ -169,3 +170,25 @@ class StudySyllabusSnapshot(models.Model):
             models.UniqueConstraint(fields=["course","fingerprint"],name="syllabus_course_fingerprint_uniq"),
         ]
         indexes=[models.Index(fields=["course","-version"],name="syllabus_course_version_idx")]
+
+
+class LearningIntelligenceSettings(models.Model):
+    course=models.OneToOneField("courses.Course",on_delete=models.CASCADE,primary_key=True,related_name="learning_intelligence_settings")
+    is_active=models.BooleanField(default=True)
+    radar_enabled=models.BooleanField(default=True)
+    error_coach_enabled=models.BooleanField(default=True)
+    domain_proof_enabled=models.BooleanField(default=True)
+    mastery_map_enabled=models.BooleanField(default=True)
+    real_exam_enabled=models.BooleanField(default=True)
+    telemetry_enabled=models.BooleanField(default=True)
+    diagnostic_min_answers=models.PositiveSmallIntegerField(default=5)
+    domain_proof_question_count=models.PositiveSmallIntegerField(default=10)
+    real_exam_min_questions=models.PositiveSmallIntegerField(default=10)
+    real_exam_question_count=models.PositiveSmallIntegerField(default=60)
+    validating_score_threshold=models.PositiveSmallIntegerField(default=60)
+    retained_score_threshold=models.PositiveSmallIntegerField(default=80)
+    retention_min_correct_days=models.PositiveSmallIntegerField(default=2)
+    retention_min_span_days=models.PositiveSmallIntegerField(default=2)
+    retained_recheck_days=models.PositiveSmallIntegerField(default=14)
+    updated_by=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.SET_NULL,null=True,blank=True,related_name="+")
+    updated_at=models.DateTimeField(auto_now=True)
