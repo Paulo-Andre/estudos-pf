@@ -58,7 +58,7 @@ function NumberField({ label, detail, value, min, max, onChange }: { label: stri
 }
 
 export function LearningIntelligenceAdminPanel() {
-  const utils=trpc.useUtils();
+  const utils=trpc.useUtils() as any;
   const coursesQuery=trpc.admin.courses.useQuery(undefined,{refetchOnWindowFocus:false});
   const courses=(coursesQuery.data??[]).filter((course:any)=>course.courseType==="concurso");
   const [courseId,setCourseId]=useState("");
@@ -67,7 +67,7 @@ export function LearningIntelligenceAdminPanel() {
   const [messageKind,setMessageKind]=useState<"success"|"error">("success");
 
   useEffect(()=>{if(!courseId&&courses.length)setCourseId(courses[0].id);},[courseId,courses]);
-  const settingsQuery=(trpc.admin.learningIntelligence.getSettings as any).useQuery({courseId},{enabled:Boolean(courseId),refetchOnWindowFocus:false});
+  const settingsQuery=(trpc.admin as any).learningIntelligence.getSettings.useQuery({courseId},{enabled:Boolean(courseId),refetchOnWindowFocus:false});
   useEffect(()=>{
     if(!settingsQuery.data)return;
     setForm(Object.fromEntries(Object.entries(defaults).map(([key,fallback])=>[key,settingsQuery.data[key]??fallback])) as LearningSettingsForm);
@@ -80,7 +80,7 @@ export function LearningIntelligenceAdminPanel() {
     if(form.realExamQuestionCount<form.realExamMinQuestions)return "A quantidade-alvo da Prova Real não pode ser menor que o mínimo.";
     return null;
   },[form]);
-  const save=(trpc.admin.learningIntelligence.saveSettings as any).useMutation({
+  const save=(trpc.admin as any).learningIntelligence.saveSettings.useMutation({
     onSuccess:async()=>{setMessageKind("success");setMessage("Configurações aplicadas ao curso. A experiência dos alunos será atualizada na próxima leitura.");await Promise.all([utils.admin.learningIntelligence.getSettings.invalidate(),utils.study.learningFeatures.invalidate(),utils.study.learningIntelligence.invalidate()]);},
     onError:(error:any)=>{setMessageKind("error");setMessage(error.message);},
   });
