@@ -99,8 +99,8 @@ class KnowledgeTests(APITestCase):
     def test_content_xlsx_preview_and_commit(self):
         self.client.force_authenticate(self.admin)
         payload=make_xlsx(
-            ["titulo","objetivo","corpo","disciplinas","status","exigir_revisao","aviso"],
-            [["Princípios Administrativos","Dominar princípios.","Conteúdo didático importado com texto suficiente.","port","draft","NÃO","NOVO"]],
+            ["titulo","objetivo","descricao","resumo_card","corpo","disciplinas","status","exigir_revisao","aviso","capa_url","video_url","video_rotulo","material_url","material_rotulo"],
+            [["Princípios Administrativos","Dominar princípios.","Descrição pedagógica.","Resumo do card.","Conteúdo didático importado com texto suficiente.","port","draft","NÃO","NOVO","https://exemplo.com/capa.webp","https://www.youtube.com/watch?v=abc","Assistir videoaula","https://exemplo.com/apostila.pdf","Baixar PDF"]],
         )
         preview=self.client.post("/api/v1/knowledge/admin/import/contents/",{"file":SimpleUploadedFile("conteudos.xlsx",payload),"dryRun":"true"},format="multipart")
         self.assertEqual(preview.status_code,200)
@@ -109,12 +109,28 @@ class KnowledgeTests(APITestCase):
         self.assertEqual(commit.status_code,201)
         created=Content.objects.get(pk=commit.data["createdIds"][0])
         self.assertEqual(created.notice_kind,"new")
+        self.assertEqual(created.video_url,"https://www.youtube.com/watch?v=abc")
+        self.assertEqual(created.video_label,"Assistir videoaula")
+        self.assertEqual(created.material_url,"https://exemplo.com/apostila.pdf")
+        self.assertEqual(created.material_label,"Baixar PDF")
+        self.assertEqual(created.cover_image_url,"https://exemplo.com/capa.webp")
         self.assertEqual(created.discipline_links.first().discipline,self.discipline)
+
+    def test_content_import_rejects_unsafe_or_invalid_urls(self):
+        self.client.force_authenticate(self.admin)
+        payload=make_xlsx(
+            ["titulo","video_url"],
+            [["Conteúdo com link inválido","javascript:alert(1)"]],
+        )
+        response=self.client.post("/api/v1/knowledge/admin/import/contents/",{"file":SimpleUploadedFile("conteudos.xlsx",payload),"dryRun":"true"},format="multipart")
+        self.assertEqual(response.status_code,200)
+        self.assertEqual(response.data["invalidRows"],1)
+        self.assertIn("video_url",response.data["preview"][0]["errors"][0])
 
     def test_pdf_content_preview_and_commit(self):
         self.client.force_authenticate(self.admin)
         pdf=make_text_pdf("Conteudo textual de Direito Administrativo para importacao com explicacoes e conceitos suficientes para uma aula.")
-        base={"dryRun":"true","title":"Aula importada do PDF","disciplineIds":str(self.discipline.id),"status":"draft","requiresReview":"true"}
+        base={"dryRun":"true","title":"Aula importada do PDF","disciplineIds":str(self.discipline.id),"status":"draft","requiresReview":"true","coverImageUrl":"https://exemplo.com/capa.webp","videoUrl":"https://www.youtube.com/watch?v=pdf","videoLabel":"Video complementar","materialUrl":"https://exemplo.com/material.pdf","materialLabel":"Baixar material","noticeKind":"updated"}
         preview=self.client.post("/api/v1/knowledge/admin/import/contents/",{"file":SimpleUploadedFile("aula.pdf",pdf,content_type="application/pdf"),**base},format="multipart")
         self.assertEqual(preview.status_code,200)
         self.assertEqual(preview.data["format"],"pdf")
@@ -124,6 +140,12 @@ class KnowledgeTests(APITestCase):
         created=Content.objects.get(pk=commit.data["createdIds"][0])
         self.assertIn("Direito Administrativo",created.body)
         self.assertTrue(created.requires_review)
+        self.assertEqual(created.video_url,"https://www.youtube.com/watch?v=pdf")
+        self.assertEqual(created.video_label,"Video complementar")
+        self.assertEqual(created.material_url,"https://exemplo.com/material.pdf")
+        self.assertEqual(created.material_label,"Baixar material")
+        self.assertEqual(created.cover_image_url,"https://exemplo.com/capa.webp")
+        self.assertEqual(created.notice_kind,"updated")
 
     def test_import_templates_are_downloadable_xlsx(self):
         self.client.force_authenticate(self.admin)
