@@ -96,6 +96,7 @@ async function queryProcedure(path: string, input: any) {
     case "study.contentProgress.get": return api("/api/v1/study/courses/" + id(input.courseId) + "/progress/");
     case "study.roadmap.list": return api("/api/v1/study/roadmap/" + qs(input, ["courseId"]));
     case "study.note": return api("/api/v1/study/notes/" + id(input.moduleId) + "/");
+    case "study.simulationReflection": return api("/api/v1/study/simulations/" + id(input.simulationId) + "/reflection/");
     case "competition.settings": return api("/api/v1/platform/competition/settings/");
     case "competition.courses": return api("/api/v1/platform/competition/courses/");
     case "competition.ranking": return api("/api/v1/platform/competition/ranking/" + qs(input, ["courseId"]));
@@ -172,6 +173,7 @@ async function mutationProcedure(path: string, input: any) {
     case "study.roadmap.save": return api("/api/v1/study/roadmap/", json("POST", input));
     case "study.roadmap.remove": return api("/api/v1/study/roadmap/" + id(input.id) + "/", { method: "DELETE" });
     case "study.submitSimulation": return api("/api/v1/study/simulation/", json("POST", input));
+    case "study.simulationReflection.save": return api("/api/v1/study/simulations/" + id(input.simulationId) + "/reflection/", json("PUT", input));
     case "study.saveNote": return api("/api/v1/study/notes/" + id(input.moduleId) + "/", json("PUT", { content: input.content }));
     case "competition.startRound": return api("/api/v1/platform/competition/start/", json("POST", input || {}));
     case "competition.submitAnswer": return api("/api/v1/platform/competition/" + id(input.roundId) + "/answer/", json("POST", input));

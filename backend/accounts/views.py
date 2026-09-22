@@ -192,9 +192,10 @@ class DataExportView(APIView):
     def get(self,request):
         from courses.models import CourseEnrollment
         from commerce.models import CommerceOrder
-        from study.models import CompletedModule,SimulationRecord,StudyAnswer,StudyNote,StudyProfile,StudyReviewItem,StudyRoadmapItem
+        from study.models import CompletedModule,SimulationRecord,SimulationReflection,StudyAnswer,StudyNote,StudyProfile,StudyReviewItem,StudyRoadmapItem
         profile=getattr(request.user,"account_profile",None)
         study=StudyProfile.objects.filter(user=request.user).first()
+        reflections={item.simulation_id:item for item in SimulationReflection.objects.filter(simulation__user=request.user)}
         payload={
             "account":SafeUserSerializer(request.user).data,
             "preferences":PreferencesView().get(request).data,
@@ -205,7 +206,9 @@ class DataExportView(APIView):
             "notes":[{"moduleId":x.module_id,"content":x.content} for x in StudyNote.objects.filter(user=request.user)],
             "reviewItems":[{"questionKey":x.question_key,"status":x.status,"snapshot":x.snapshot_json} for x in StudyReviewItem.objects.filter(user=request.user)],
             "roadmap":[{"courseId":x.course_id,"contentId":x.content_id,"weekday":x.weekday,"startTime":x.start_time,"isActive":x.is_active} for x in StudyRoadmapItem.objects.filter(user=request.user)],
-            "simulations":[{"id":x.id,"completedAt":x.completed_at,"total":x.total,"correct":x.correct,"errors":x.errors} for x in SimulationRecord.objects.filter(user=request.user).order_by("-completed_at")],
+            "simulations":[{"id":x.id,"completedAt":x.completed_at,"total":x.total,"correct":x.correct,"errors":x.errors,
+                "reflection":None if x.id not in reflections else {"confidence":reflections[x.id].confidence,"primaryCause":reflections[x.id].primary_cause,
+                    "nextAction":reflections[x.id].next_action,"note":reflections[x.id].note}} for x in SimulationRecord.objects.filter(user=request.user).order_by("-completed_at")],
             "orders":[{"id":x.id,"planId":x.plan_id,"status":x.status,"totalCents":x.total_cents,"currency":x.currency,"createdAt":x.created_at} for x in CommerceOrder.objects.filter(user=request.user).order_by("-created_at")],
         }
         record_security_event(request,"data_exported",request.user)

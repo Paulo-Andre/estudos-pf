@@ -8,7 +8,7 @@ from courses.models import Course,CourseEnrollment
 from knowledge.models import Content,CourseDiscipline,Discipline,DisciplineContent,Question,QuestionContentLink
 from .advanced_services import queue_review,rate_review
 from .learning_services import learning_plan
-from .models import StudyReviewItem
+from .models import SimulationRecord,SimulationReflection,StudyReviewItem
 
 
 class LearningMethodologyTests(TestCase):
@@ -69,3 +69,32 @@ class LearningMethodologyTests(TestCase):
         plan=learning_plan(self.user,self.course)
         self.assertEqual(plan["metrics"]["examDays"],21)
         self.assertEqual(plan["metrics"]["intensity"],"reta_final")
+
+
+    def test_simulation_reflection_is_private_and_persisted(self):
+        simulation=SimulationRecord.objects.create(id="meta-sim-1",user=self.user,total=10,correct=7,errors=3,elapsed_seconds=600,by_discipline={},by_block={})
+        client=APIClient();client.force_authenticate(self.user)
+        response=client.put("/api/v1/study/simulations/meta-sim-1/reflection/",{
+            "confidence":4,"primaryCause":"interpretation","nextAction":"review","note":"Ler o enunciado com mais calma."
+        },format="json")
+        self.assertEqual(response.status_code,200)
+        reflection=SimulationReflection.objects.get(simulation=simulation)
+        self.assertEqual(reflection.confidence,4)
+        self.assertEqual(reflection.primary_cause,"interpretation")
+        state_response=client.get("/api/v1/study/state/")
+        record=next(item for item in state_response.data["simulations"] if item["id"]=="meta-sim-1")
+        self.assertEqual(record["reflection"]["nextAction"],"review")
+
+        other=get_user_model().objects.create_user("other-meta","other-meta@example.com","Aluno-F0rte!2026")
+        CourseEnrollment.objects.create(user=other,course=self.course,created_by=self.admin,start_at=timezone.now()-timedelta(days=1),expires_at=timezone.now()+timedelta(days=30))
+        other_client=APIClient();other_client.force_authenticate(other)
+        forbidden=other_client.get("/api/v1/study/simulations/meta-sim-1/reflection/")
+        self.assertEqual(forbidden.status_code,404)
+
+    def test_simulation_reflection_validates_choices(self):
+        SimulationRecord.objects.create(id="meta-sim-2",user=self.user,total=10,correct=5,errors=5,elapsed_seconds=700,by_discipline={},by_block={})
+        client=APIClient();client.force_authenticate(self.user)
+        invalid=client.put("/api/v1/study/simulations/meta-sim-2/reflection/",{
+            "confidence":9,"primaryCause":"unknown","nextAction":"review"
+        },format="json")
+        self.assertEqual(invalid.status_code,400)

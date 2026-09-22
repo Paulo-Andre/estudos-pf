@@ -2,7 +2,7 @@ from django.urls import path
 from .views import (
     AnswerView,BookmarkDetailView,BookmarkListView,CompleteView,ContentProgressView,CourseProgressView,DailyQuickCheckView,LearningPlanView,
     NoteView,ResumeView,ReviewDeleteView,ReviewItemsView,ReviewMasteredView,ReviewRateView,
-    RoadmapDeleteView,RoadmapView,SimulationDetailView,StateView,StudyQuestionsView,
+    RoadmapDeleteView,RoadmapView,SimulationDetailView,SimulationReflectionView,StateView,StudyQuestionsView,
     SubmitSimulationView,WeeklyGoalView,
 )
 urlpatterns=[
@@ -14,6 +14,7 @@ urlpatterns=[
     path("questions/",StudyQuestionsView.as_view()),
     path("simulation/",SubmitSimulationView.as_view()),
     path("simulations/<str:simulation_id>/",SimulationDetailView.as_view()),
+    path("simulations/<str:simulation_id>/reflection/",SimulationReflectionView.as_view()),
     path("review/",ReviewItemsView.as_view()),
     path("review/<int:item_id>/mastered/",ReviewMasteredView.as_view()),
     path("review/<int:item_id>/rate/",ReviewRateView.as_view()),

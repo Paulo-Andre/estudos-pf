@@ -2,15 +2,20 @@ from datetime import date,timedelta
 from django.db import transaction
 from django.utils import timezone
 from knowledge.models import Question,SimulationQuestion
-from .models import StudyProfile,CompletedModule,StudyAnswer,SimulationRecord,StudyNote
+from .models import StudyProfile,CompletedModule,StudyAnswer,SimulationRecord,SimulationReflection,StudyNote
 
 def profile(user):return StudyProfile.objects.get_or_create(user=user)[0]
+def _reflection_payload(record):
+    try:r=record.reflection
+    except SimulationReflection.DoesNotExist:return None
+    return {"confidence":r.confidence,"primaryCause":r.primary_cause,"nextAction":r.next_action,"note":r.note,"updatedAt":r.updated_at.isoformat()}
+
 def state(user):
-    p=profile(user);sims=list(SimulationRecord.objects.filter(user=user).order_by("completed_at"))
+    p=profile(user);sims=list(SimulationRecord.objects.filter(user=user).select_related("reflection").order_by("completed_at"))
     week_start=timezone.now()-timedelta(days=7)
     return {"completedModules":[x.module_id for x in CompletedModule.objects.filter(user=user)],
     "answers":[{"questionId":x.question_id,"correct":x.correct,"answeredAt":x.answered_at.isoformat()} for x in StudyAnswer.objects.filter(user=user).order_by("answered_at")],
-    "simulations":[{"id":x.id,"date":x.completed_at.isoformat(),"total":x.total,"correct":x.correct,"errors":x.errors,"elapsedSeconds":x.elapsed_seconds,"byDiscipline":x.by_discipline,"byBlock":x.by_block} for x in sims],
+    "simulations":[{"id":x.id,"date":x.completed_at.isoformat(),"total":x.total,"correct":x.correct,"errors":x.errors,"elapsedSeconds":x.elapsed_seconds,"byDiscipline":x.by_discipline,"byBlock":x.by_block,"reflection":_reflection_payload(x)} for x in sims],
     "xp":p.xp,"lastStudyDate":p.last_study_date.isoformat() if p.last_study_date else None,"studyDates":p.study_dates,"usedQuestionIds":p.used_question_ids,
     "weeklySimulationCorrect":sum(x.correct for x in sims if x.completed_at>=week_start)}
 def activity(user,xp,questions=()):
@@ -55,4 +60,4 @@ def simulation_detail(user,simulation_id):
     record=SimulationRecord.objects.filter(pk=simulation_id,user=user).first()
     if not record:return None
     return {"id":record.id,"date":record.completed_at,"total":record.total,"correct":record.correct,"errors":record.errors,"elapsedSeconds":record.elapsed_seconds,
-        "byDiscipline":record.by_discipline,"byBlock":record.by_block,"questions":[{"position":q.position,"questionId":q.question_id,"correct":q.answered_correctly,"snapshot":q.snapshot_json} for q in record.question_snapshots.order_by("position")]}
+        "byDiscipline":record.by_discipline,"byBlock":record.by_block,"reflection":_reflection_payload(record),"questions":[{"position":q.position,"questionId":q.question_id,"correct":q.answered_correctly,"snapshot":q.snapshot_json} for q in record.question_snapshots.order_by("position")]}

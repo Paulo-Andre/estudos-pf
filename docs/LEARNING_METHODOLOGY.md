@@ -112,3 +112,17 @@ Toda nova questão deve ter explicação suficiente para transformar o erro em a
 - manter controles acessíveis em celular;
 - evitar notificações ou mecânicas que estimulem uso compulsivo;
 - permitir ao aluno ignorar uma recomendação e escolher outra atividade.
+
+
+## Debriefing metacognitivo
+
+Depois de um simulado, o aluno registra uma reflexão curta:
+
+- confiança percebida de 1 a 5;
+- principal causa dos erros: conteúdo, interpretação, atenção, tempo ou estratégia;
+- uma próxima ação concreta;
+- nota opcional curta.
+
+A reflexão não altera a nota do simulado. Ela serve para calibrar a percepção do aluno, reconhecer padrões recorrentes e transformar o histórico em instrumento de aprendizagem.
+
+O histórico deve destacar tendência de desempenho e as reflexões registradas, evitando tratar cada simulado como um evento isolado.

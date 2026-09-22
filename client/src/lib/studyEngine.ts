@@ -11,6 +11,13 @@ export type SimulationRecord = {
   elapsedSeconds: number;
   byDiscipline: Record<string, { correct: number; total: number }>;
   byBlock: Record<Block, { correct: number; total: number }>;
+  reflection?: {
+    confidence: number;
+    primaryCause: "knowledge" | "attention" | "time" | "interpretation" | "strategy";
+    nextAction: "review" | "practice" | "content" | "time_strategy" | "simulate";
+    note: string;
+    updatedAt?: string;
+  } | null;
 };
 
 export type StudyState = {

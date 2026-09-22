@@ -8,7 +8,7 @@ from courses.permissions import HasContestAccess,HasStudyAccess
 from knowledge.models import Content,Discipline,Question
 from knowledge.services import can_use_question,question_payload
 from .advanced_services import course_progress_payload,daily_quick_check,dismiss_daily_quick_check,mark_content_opened,mark_review_mastered,queue_review,rate_review,remove_review_item,remove_roadmap_item,resume_content,roadmap_payload,save_roadmap_item
-from .models import StudyBookmark,StudyNote,StudyReviewItem,StudyRoadmapItem
+from .models import SimulationRecord,SimulationReflection,StudyBookmark,StudyNote,StudyReviewItem,StudyRoadmapItem
 from .learning_services import learning_plan,queue_question_error
 from .services import answer,complete,simulation_detail,state,submit_simulation
 
@@ -185,3 +185,30 @@ class LearningPlanView(APIView):
         course=get_object_or_404(Course,pk=request.query_params.get("courseId"))
         try:return Response(learning_plan(request.user,course))
         except PermissionError as exc:return Response({"detail":str(exc)},status=403)
+
+
+class SimulationReflectionView(APIView):
+    permission_classes=[HasContestAccess]
+    def get(self,request,simulation_id):
+        simulation=SimulationRecord.objects.filter(pk=simulation_id,user=request.user).first()
+        if not simulation:return Response({"detail":"Simulado não encontrado."},status=404)
+        reflection=SimulationReflection.objects.filter(simulation=simulation).first()
+        if not reflection:return Response(None)
+        return Response({"confidence":reflection.confidence,"primaryCause":reflection.primary_cause,
+            "nextAction":reflection.next_action,"note":reflection.note,"updatedAt":reflection.updated_at})
+    def put(self,request,simulation_id):
+        simulation=SimulationRecord.objects.filter(pk=simulation_id,user=request.user).first()
+        if not simulation:return Response({"detail":"Simulado não encontrado."},status=404)
+        try:confidence=int(request.data.get("confidence"))
+        except (TypeError,ValueError):return Response({"detail":"Confiança deve estar entre 1 e 5."},status=400)
+        cause=str(request.data.get("primaryCause") or "")
+        next_action=str(request.data.get("nextAction") or "")
+        if confidence<1 or confidence>5:return Response({"detail":"Confiança deve estar entre 1 e 5."},status=400)
+        if cause not in SimulationReflection.Cause.values:return Response({"detail":"Causa de erro inválida."},status=400)
+        if next_action not in SimulationReflection.NextAction.values:return Response({"detail":"Próxima ação inválida."},status=400)
+        reflection,_=SimulationReflection.objects.update_or_create(simulation=simulation,defaults={
+            "confidence":confidence,"primary_cause":cause,"next_action":next_action,
+            "note":str(request.data.get("note") or "")[:600],
+        })
+        return Response({"confidence":reflection.confidence,"primaryCause":reflection.primary_cause,
+            "nextAction":reflection.next_action,"note":reflection.note,"updatedAt":reflection.updated_at})
