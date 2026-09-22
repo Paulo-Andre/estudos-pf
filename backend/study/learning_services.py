@@ -59,9 +59,9 @@ def queue_question_error(user,question_key,source="answer_error",snapshot=None):
     return queue_review(user,key,snapshot,source=source)
 
 
-def _simulation_metrics(user):
+def _simulation_metrics(user,course):
     totals={}
-    for sim in SimulationRecord.objects.filter(user=user).order_by("-completed_at")[:8]:
+    for sim in SimulationRecord.objects.filter(user=user,course=course).order_by("-completed_at")[:8]:
         for discipline,value in (sim.by_discipline or {}).items():
             metric=totals.setdefault(discipline,{"correct":0,"total":0})
             try:
@@ -118,9 +118,9 @@ def learning_plan(user,course):
     due=list(StudyReviewItem.objects.filter(user=user,status="pending").filter(Q(due_at__isnull=True)|Q(due_at__lte=timezone.now())).order_by("due_at","created_at"))
     review_health=100 if not reviews else max(0,round((len(reviews)-len(due))*100/len(reviews)))
 
-    weaknesses=_simulation_metrics(user)
+    weaknesses=_simulation_metrics(user,course)
     weak=weaknesses[0] if weaknesses and weaknesses[0]["accuracy"]<80 else None
-    recent_sim=SimulationRecord.objects.filter(user=user).order_by("-completed_at").first()
+    recent_sim=SimulationRecord.objects.filter(user=user,course=course).order_by("-completed_at").first()
     sim_accuracy=round(recent_sim.correct*100/recent_sim.total) if recent_sim and recent_sim.total else None
     accuracy_values=[row["accuracy"] for row in weaknesses]
     accuracy=round(sum(accuracy_values)/len(accuracy_values)) if accuracy_values else (sim_accuracy if sim_accuracy is not None else 0)
