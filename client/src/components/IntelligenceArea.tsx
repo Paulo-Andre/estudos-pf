@@ -1,4 +1,4 @@
-import { Activity, Brain, CheckCircle2, FileSearch, Gauge, RefreshCw, ShieldCheck, Target, TimerReset, TriangleAlert } from "lucide-react";
+import { Brain, FileSearch, Gauge, RefreshCw, ShieldCheck, Target, TimerReset, TriangleAlert } from "lucide-react";
 
 export type IntelligenceTopic = {
   key: string;
