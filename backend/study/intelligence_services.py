@@ -9,7 +9,33 @@ from django.utils import timezone
 from courses.permissions import has_active_enrollment
 from knowledge.models import CourseDiscipline,DisciplineContent,Question
 from knowledge.services import can_use_question
-from .models import SimulationRecord,SimulationReflection,StudyAnswer,StudyContentProgress,StudyReviewItem,StudySyllabusSnapshot
+from .models import LearningIntelligenceSettings,SimulationRecord,SimulationReflection,StudyAnswer,StudyContentProgress,StudyReviewItem,StudySyllabusSnapshot
+
+
+def learning_settings(course):
+    return LearningIntelligenceSettings.objects.get_or_create(course=course)[0]
+
+
+def learning_settings_payload(settings):
+    return {
+        "enabled":settings.is_active,
+        "radarEnabled":settings.radar_enabled,
+        "errorCoachEnabled":settings.error_coach_enabled,
+        "domainProofEnabled":settings.domain_proof_enabled,
+        "masteryMapEnabled":settings.mastery_map_enabled,
+        "realExamEnabled":settings.real_exam_enabled,
+        "telemetryEnabled":settings.telemetry_enabled,
+        "diagnosticMinAnswers":settings.diagnostic_min_answers,
+        "domainProofQuestionCount":settings.domain_proof_question_count,
+        "realExamMinQuestions":settings.real_exam_min_questions,
+        "realExamQuestionCount":settings.real_exam_question_count,
+        "validatingScoreThreshold":settings.validating_score_threshold,
+        "retainedScoreThreshold":settings.retained_score_threshold,
+        "retentionMinCorrectDays":settings.retention_min_correct_days,
+        "retentionMinSpanDays":settings.retention_min_span_days,
+        "retainedRecheckDays":settings.retained_recheck_days,
+        "updatedAt":settings.updated_at.isoformat() if settings.updated_at else None,
+    }
 
 
 def _course_blueprint(course):
@@ -97,10 +123,10 @@ def _question_index(course,content_ids):
     return alias_to_contents,{key:len(value) for key,value in question_count.items()}
 
 
-def _mastery(user,course,items):
+def _mastery(user,course,items,settings):
     content_ids={int(item["contentId"]) for item in items}
     alias_to_contents,question_count=_question_index(course,content_ids)
-    answers=StudyAnswer.objects.filter(user=user,question_id__in=list(alias_to_contents.keys())).order_by("answered_at")
+    answers=StudyAnswer.objects.filter(user=user,course=course,question_id__in=list(alias_to_contents.keys())).order_by("answered_at")
     progress=set(StudyContentProgress.objects.filter(user=user,course=course,status="completed",content_id__in=content_ids).values_list("content_id",flat=True))
     metrics={content_id:{"total":0,"correct":0,"correctDays":set(),"confidence":0,"calibrated":0,"lastCorrect":None} for content_id in content_ids}
     for answer in answers:
@@ -121,20 +147,20 @@ def _mastery(user,course,items):
         evidence_factor=min(1,total/5) if total else 0
         practice=round((accuracy/100)*45*evidence_factor)
         correct_days=sorted(metric["correctDays"])
-        retention=20 if len(correct_days)>=2 and (correct_days[-1]-correct_days[0]).days>=2 else 10 if correct else 0
+        retention=20 if len(correct_days)>=settings.retention_min_correct_days and (correct_days[-1]-correct_days[0]).days>=settings.retention_min_span_days else 10 if correct else 0
         calibration=round((metric["calibrated"]/metric["confidence"])*10) if metric["confidence"]>=3 else 0
         score=min(100,(25 if content_id in progress else 0)+practice+retention+calibration)
-        state="retained" if score>=80 and retention==20 else "validating" if score>=60 else "learning" if score>0 else "new"
+        state="retained" if score>=settings.retained_score_threshold and retention==20 else "validating" if score>=settings.validating_score_threshold else "learning" if score>0 else "new"
         last_correct=metric["lastCorrect"]
-        if state=="retained" and last_correct:next_proof=last_correct.date()+timedelta(days=14)
-        elif state=="validating" and last_correct:next_proof=last_correct.date()+timedelta(days=3)
+        if state=="retained" and last_correct:next_proof=last_correct.date()+timedelta(days=settings.retained_recheck_days)
+        elif state=="validating" and last_correct:next_proof=last_correct.date()+timedelta(days=max(1,settings.retention_min_span_days))
         else:next_proof=today
         qcount=question_count.get(content_id,0)
         proof_due=qcount>=3 and next_proof<=today and state!="new"
         topic_rows.append({
             **item,"score":score,"state":state,"completed":content_id in progress,
             "accuracy":accuracy,"answerCount":total,"correctDays":len(correct_days),
-            "questionCount":qcount,"proofReady":qcount>=3 and score>=35 and state!="retained",
+            "questionCount":qcount,"proofQuestionCount":min(settings.domain_proof_question_count,qcount),"proofReady":qcount>=3 and score>=35 and state!="retained",
             "proofDue":proof_due,"nextProofAt":next_proof.isoformat(),
         })
     grouped=defaultdict(list)
@@ -159,10 +185,10 @@ def _mastery(user,course,items):
     }
 
 
-def _error_coach(user,course,items):
+def _error_coach(user,course,items,settings):
     content_ids={int(item["contentId"]) for item in items}
     alias_to_contents,_=_question_index(course,content_ids)
-    recent=list(StudyAnswer.objects.filter(user=user,question_id__in=list(alias_to_contents.keys())).order_by("-answered_at")[:250])
+    recent=list(StudyAnswer.objects.filter(user=user,course=course,question_id__in=list(alias_to_contents.keys())).order_by("-answered_at")[:250])
     wrong=[item for item in recent if not item.correct]
     counts=defaultdict(int)
     hotspots=defaultdict(int)
@@ -199,7 +225,7 @@ def _error_coach(user,course,items):
         discipline,subject=content_labels.get(content_id,("",""))
         hotspot_rows.append({"discipline":discipline,"subject":subject,"errors":count})
     return {
-        "sample":len(recent),"wrong":len(wrong),"primaryPattern":patterns[0] if patterns else None,
+        "sample":len(recent),"wrong":len(wrong),"primaryPattern":patterns[0] if patterns and len(recent)>=settings.diagnostic_min_answers else None,
         "patterns":patterns[:5],"hotspots":hotspot_rows,
     }
 
@@ -222,25 +248,32 @@ def _telemetry(user,course):
 
 def learning_intelligence(user,course):
     if not has_active_enrollment(user,course.id):raise PermissionError("Matrícula vigente necessária.")
-    snapshot=ensure_syllabus_snapshot(course)
-    items=list(snapshot.items_json or [])
+    settings=learning_settings(course)
+    if not settings.is_active:raise PermissionError("A central de Inteligência está desativada para este curso.")
+    snapshot=ensure_syllabus_snapshot(course) if settings.radar_enabled else None
+    items=list(snapshot.items_json or []) if snapshot else _course_blueprint(course)
     completed=set(StudyContentProgress.objects.filter(user=user,course=course,status="completed").values_list("content_id",flat=True))
-    covered=sum(1 for item in items if int(item["contentId"]) in completed)
-    change=dict(snapshot.change_summary_json or {})
-    radar={
-        "version":snapshot.version,"fingerprint":snapshot.fingerprint,"capturedAt":snapshot.created_at.isoformat(),
-        "totalTopics":len(items),"coveredTopics":covered,
-        "coveragePercent":round(covered*100/len(items)) if items else 0,
-        "changes":change,
-        "message":"Primeira fotografia do edital registrada." if change.get("baseline") else (
-            f"{change.get('changedCount',0)} alteração(ões) detectada(s) desde a versão anterior."
-        ),
-    }
-    mastery=_mastery(user,course,items)
+    radar=None
+    if settings.radar_enabled and snapshot:
+        covered=sum(1 for item in items if int(item["contentId"]) in completed)
+        change=dict(snapshot.change_summary_json or {})
+        radar={
+            "version":snapshot.version,"fingerprint":snapshot.fingerprint,"capturedAt":snapshot.created_at.isoformat(),
+            "totalTopics":len(items),"coveredTopics":covered,
+            "coveragePercent":round(covered*100/len(items)) if items else 0,
+            "changes":change,
+            "message":"Primeira fotografia do edital registrada." if change.get("baseline") else (
+                f"{change.get('changedCount',0)} alteração(ões) detectada(s) desde a versão anterior."
+            ),
+        }
+    mastery=_mastery(user,course,items,settings) if (settings.mastery_map_enabled or settings.domain_proof_enabled) else None
+    if mastery and not settings.mastery_map_enabled:mastery["disciplines"]=[]
+    if mastery and not settings.domain_proof_enabled:mastery["proofCandidates"]=[]
     return {
         "courseId":course.id,
+        "features":learning_settings_payload(settings),
         "radar":radar,
-        "errorCoach":_error_coach(user,course,items),
+        "errorCoach":_error_coach(user,course,items,settings) if settings.error_coach_enabled else None,
         "mastery":mastery,
-        "telemetry":_telemetry(user,course),
+        "telemetry":_telemetry(user,course) if settings.real_exam_enabled and settings.telemetry_enabled else None,
     }
