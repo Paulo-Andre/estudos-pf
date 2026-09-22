@@ -256,6 +256,11 @@ function StudyWorkspace({ user, logout, initialView, initialCommercePlanId, onCo
   }, [privateState.data]);
 
   useEffect(() => {
+    if (view === "Inteligência" && learningFeaturesQuery.data && learningFeaturesQuery.data.enabled !== true) setView("Painel");
+  }, [view, learningFeaturesQuery.data]);
+
+
+  useEffect(() => {
     const prefs=uiPreferencesQuery.data;
     if (!prefs) return;
     document.documentElement.dataset.reducedMotion=prefs.reducedMotion ? "true" : "false";
