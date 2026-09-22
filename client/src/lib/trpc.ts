@@ -74,6 +74,19 @@ async function uploadImage(input: any) {
   return api("/api/v1/platform/admin/uploads/images/", { method: "POST", body: form });
 }
 
+async function uploadKnowledgeImport(input: any, endpoint: string) {
+  const file=input?.file;
+  if (!(file instanceof File)) throw new Error("Selecione um arquivo para importar.");
+  const form=new FormData();
+  form.append("file",file,file.name);
+  form.append("dryRun",input?.dryRun===false?"false":"true");
+  for (const key of ["title","objective","description","cardText","status","requiresReview"]) {
+    if (input?.[key] !== undefined && input?.[key] !== null) form.append(key,String(input[key]));
+  }
+  if (Array.isArray(input?.disciplineIds)) form.append("disciplineIds",input.disciplineIds.join(","));
+  return api(endpoint,{method:"POST",body:form});
+}
+
 function id(v: any) { return encodeURIComponent(String(v)); }
 
 async function queryProcedure(path: string, input: any) {
@@ -216,6 +229,8 @@ async function mutationProcedure(path: string, input: any) {
     case "admin.questions.create": return api("/api/v1/knowledge/admin/questions/", json("POST", input));
     case "admin.questions.update": return api("/api/v1/knowledge/admin/questions/" + id(input.id) + "/", json("PUT", input.data));
     case "admin.questions.remove": return api("/api/v1/knowledge/admin/questions/" + id(input.id) + "/", { method: "DELETE" });
+    case "admin.questions.importXlsx": return uploadKnowledgeImport(input,"/api/v1/knowledge/admin/import/questions/");
+    case "admin.contents.importFile": return uploadKnowledgeImport(input,"/api/v1/knowledge/admin/import/contents/");
     case "admin.questions.sendToReview": return api("/api/v1/knowledge/admin/reviews/submit/", json("POST", { itemType: "question", itemId: input.id }));
     case "admin.review.decide": return api("/api/v1/knowledge/admin/reviews/" + id(input.id) + "/decision/", json("POST", { decision: input.decision, notes: input.notes }));
     case "admin.commerce.createPlan": return api("/api/v1/commerce/admin/plans/", json("POST", input));
