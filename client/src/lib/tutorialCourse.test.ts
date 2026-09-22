@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 import { canOpenTutorialView, isTutorialCourseExperience, tutorialRestrictedViews } from "./tutorialCourse";
 
 describe("experiência de curso Tutorial", () => {
-  it("oculta somente Competição, Revisar e Simulados para aluno de Tutorial", () => {
-    const visible = ["Painel", "Conteúdo", "Roteiro", "Simulados", "Competição", "Revisar", "Histórico"].filter(view => canOpenTutorialView(view, true));
-    expect(tutorialRestrictedViews).toEqual(["Competição", "Revisar", "Simulados"]);
+  it("oculta recursos avançados de concurso para aluno de Tutorial", () => {
+    const visible = ["Painel", "Inteligência", "Conteúdo", "Roteiro", "Simulados", "Competição", "Revisar", "Histórico"].filter(view => canOpenTutorialView(view, true));
+    expect(tutorialRestrictedViews).toEqual(["Competição", "Revisar", "Simulados", "Inteligência"]);
     expect(visible).toEqual(["Painel", "Conteúdo", "Roteiro", "Histórico"]);
   });
 
