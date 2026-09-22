@@ -44,7 +44,7 @@ def _fingerprint(items):
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
-def _change_summary(previous,current):
+def _change_summary(previous,current,baseline=False):
     before={item["key"]:item for item in previous}
     after={item["key"]:item for item in current}
     added=[after[key] for key in sorted(after.keys()-before.keys())]
@@ -55,7 +55,7 @@ def _change_summary(previous,current):
         if old.get("subject")!=new.get("subject") or old.get("updatedAt")!=new.get("updatedAt"):
             updated.append(new)
     return {
-        "baseline":not bool(previous),
+        "baseline":baseline,
         "added":added,"removed":removed,"updated":updated,
         "addedCount":len(added),"removedCount":len(removed),"updatedCount":len(updated),
         "changedCount":len(added)+len(removed)+len(updated),
@@ -72,7 +72,7 @@ def ensure_syllabus_snapshot(course):
             latest=StudySyllabusSnapshot.objects.select_for_update().filter(course=course).order_by("-version").first()
             if latest and latest.fingerprint==fingerprint:return latest
             version=(latest.version if latest else 0)+1
-            summary=_change_summary(latest.items_json if latest else [],items)
+            summary=_change_summary(latest.items_json if latest else [],items,baseline=latest is None)
             return StudySyllabusSnapshot.objects.create(
                 course=course,version=version,fingerprint=fingerprint,items_json=items,change_summary_json=summary,
             )
