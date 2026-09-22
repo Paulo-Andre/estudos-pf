@@ -78,8 +78,8 @@ def _simulation_metrics(user,course):
 
 
 
-def _metacognition(user):
-    answers=list(StudyAnswer.objects.filter(user=user,confidence__isnull=False).order_by("-answered_at")[:200])
+def _metacognition(user,course):
+    answers=list(StudyAnswer.objects.filter(user=user,course=course,confidence__isnull=False).order_by("-answered_at")[:200])
     if not answers:
         return {
             "sample":0,"score":None,"label":"coletando","overconfident":0,"underconfident":0,
@@ -110,7 +110,7 @@ def learning_plan(user,course):
     prefs,_=AccountPreferences.objects.get_or_create(user=user)
     today=date.today()
     week_start=today-timedelta(days=today.weekday())
-    questions_week=StudyAnswer.objects.filter(user=user,answered_at__date__gte=week_start).count()
+    questions_week=StudyAnswer.objects.filter(user=user,course=course,answered_at__date__gte=week_start).count()
     profile,_=StudyProfile.objects.get_or_create(user=user)
     days_week=len({str(d) for d in profile.study_dates if str(d)>=week_start.isoformat()})
 
@@ -160,7 +160,7 @@ def learning_plan(user,course):
             {"type":"recap","minutes":5,"label":"Fechamento","detail":"Faça um resumo de memória em poucas frases."},
         ]
 
-    metacognition=_metacognition(user)
+    metacognition=_metacognition(user,course)
 
     recommendations=[]
     if due:
