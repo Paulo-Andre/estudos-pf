@@ -39,6 +39,14 @@ describe("contrato da metodologia de aprendizagem", () => {
     expect(homeSource).toContain("HISTÓRICO · DIAGNÓSTICO");
   });
 
+  it("mantém metacognição e sessão adaptativa", () => {
+    expect(homeSource).toContain("SESSÃO RECOMENDADA");
+    expect(homeSource).toContain("METACOGNIÇÃO · SUA PERCEPÇÃO");
+    expect(homeSource).toContain("Qual é sua confiança nesta resposta?");
+    expect(homeSource).toContain("TREINO FOCAL");
+    expect(homeSource).toContain("learningPlan.interleaving.disciplines");
+  });
+
   it("mantém endpoints REST do plano adaptativo", () => {
     expect(trpcSource).toContain('case "study.learningPlan"');
     expect(trpcSource).toContain("/api/v1/study/learning-plan/");
