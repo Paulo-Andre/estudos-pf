@@ -20,7 +20,9 @@ class AnswerView(APIView):
     def post(self,request):
         qid=str(request.data.get("questionId") or "")[:80]
         correct=bool(request.data.get("correct"))
-        payload=answer(request.user,qid,correct)
+        confidence=request.data.get("confidence")
+        try:payload=answer(request.user,qid,correct,confidence)
+        except (TypeError,ValueError) as exc:return Response({"detail":str(exc)},status=400)
         if not correct:queue_question_error(request.user,qid,source="answer_error")
         return Response(payload)
 class CompleteView(APIView):

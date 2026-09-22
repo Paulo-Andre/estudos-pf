@@ -17,8 +17,12 @@ def activity(user,xp,questions=()):
     p=profile(user);today=date.today();p.xp+=max(0,int(xp));p.last_study_date=today
     p.study_dates=list(dict.fromkeys([*p.study_dates,today.isoformat()]));p.used_question_ids=list(dict.fromkeys([*p.used_question_ids,*[str(q) for q in questions]]));p.save()
 @transaction.atomic
-def answer(user,qid,correct):
-    StudyAnswer.objects.create(user=user,question_id=qid,correct=correct);activity(user,8 if correct else 2);return state(user)
+def answer(user,qid,correct,confidence=None):
+    confidence=int(confidence) if confidence not in (None,"") else None
+    if confidence is not None and confidence not in {1,2,3}:raise ValueError("Confiança inválida.")
+    StudyAnswer.objects.create(user=user,question_id=qid,correct=correct,confidence=confidence)
+    activity(user,8 if correct else 2)
+    return state(user)
 @transaction.atomic
 def complete(user,module):
     _,created=CompletedModule.objects.get_or_create(user=user,module_id=module)
@@ -37,7 +41,15 @@ def submit_simulation(user,data):
     record=SimulationRecord.objects.create(id=sid,user=user,total=total,correct=correct,errors=errors,elapsed_seconds=max(0,int(data.get("elapsedSeconds") or 0)),
         by_discipline=dict(data.get("byDiscipline") or {}),by_block=dict(data.get("byBlock") or {}))
     answers=list(data.get("answers") or [])
-    StudyAnswer.objects.bulk_create([StudyAnswer(user=user,question_id=str(item.get("questionId") or "")[:80],correct=bool(item.get("correct"))) for item in answers if item.get("questionId") is not None])
+    StudyAnswer.objects.bulk_create([
+        StudyAnswer(
+            user=user,
+            question_id=str(item.get("questionId") or "")[:80],
+            correct=bool(item.get("correct")),
+            confidence=int(item.get("confidence")) if item.get("confidence") in {1,2,3,"1","2","3"} else None,
+        )
+        for item in answers if item.get("questionId") is not None
+    ])
     snapshots=[]
     for position,item in enumerate(list(data.get("persistentAnswers") or []),1):
         question=Question.objects.filter(pk=item.get("questionId")).first()

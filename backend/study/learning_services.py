@@ -77,6 +77,31 @@ def _simulation_metrics(user):
     return sorted(rows,key=lambda row:(row["accuracy"],-row["total"]))
 
 
+def _metacognition(user):
+    answers=list(StudyAnswer.objects.filter(user=user,confidence__isnull=False).order_by("-answered_at")[:200])
+    if not answers:
+        return {"sample":0,"score":None,"label":"coletando","overconfident":0,"underconfident":0,
+            "tip":"Marque seu nível de confiança antes de responder para o sistema comparar percepção e desempenho."}
+    probability={1:0.55,2:0.75,3:0.9}
+    errors=[(probability.get(int(item.confidence),0.75)-(1 if item.correct else 0))**2 for item in answers]
+    score=max(0,min(100,round(100*(1-(sum(errors)/len(errors))))))
+    over=sum(1 for item in answers if item.confidence==3 and not item.correct)
+    under=sum(1 for item in answers if item.confidence==1 and item.correct)
+    if len(answers)<5:
+        label="coletando"
+        tip="Continue registrando confiança; com cinco ou mais respostas o diagnóstico fica mais útil."
+    elif over/len(answers)>=0.2:
+        label="excesso_de_confianca"
+        tip="Você está errando algumas respostas com confiança alta. Antes de responder, procure a evidência que justificaria sua escolha."
+    elif under/len(answers)>=0.25:
+        label="subestimando"
+        tip="Você acerta várias respostas mesmo com confiança baixa. Use a revisão para consolidar e reconhecer melhor o que já domina."
+    else:
+        label="calibrada"
+        tip="Sua percepção está razoavelmente alinhada ao desempenho. Continue usando a confiança como sinal de revisão."
+    return {"sample":len(answers),"score":score,"label":label,"overconfident":over,"underconfident":under,"tip":tip}
+
+
 def learning_plan(user,course):
     if not has_active_enrollment(user,course.id):raise PermissionError("Matrícula vigente necessária.")
     progress=course_progress_payload(user,course)
@@ -122,8 +147,11 @@ def learning_plan(user,course):
     if not StudyRoadmapItem.objects.filter(user=user,course=course,is_active=True).exists():
         recommendations.append({"type":"plan","priority":5,"title":"Organize sua semana","detail":"Distribua poucas disciplinas por dia para reduzir troca de contexto.","cta":"Montar roteiro"})
 
+    metacognition=_metacognition(user)
+
     return {
         "courseId":course.id,
+        "metacognition":metacognition,
         "method":{"name":"Ciclo de Domínio","steps":[
             {"id":"learn","label":"Aprender","principle":"Compreensão guiada","status":f"{completed}/{len(contents)} aulas"},
             {"id":"practice","label":"Praticar","principle":"Recuperação ativa","status":f"{questions_week}/{prefs.weekly_goal_questions} questões na semana"},

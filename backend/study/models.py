@@ -27,7 +27,15 @@ class StudyAnswer(models.Model):
     user=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.CASCADE,related_name="study_answers")
     question_id=models.CharField(max_length=80)
     correct=models.BooleanField()
+    confidence=models.PositiveSmallIntegerField(null=True,blank=True)
     answered_at=models.DateTimeField(auto_now_add=True)
+    class Meta:
+        constraints=[
+            models.CheckConstraint(
+                condition=models.Q(confidence__isnull=True)|models.Q(confidence__gte=1,confidence__lte=3),
+                name="study_answer_confidence_valid",
+            ),
+        ]
 
 class SimulationRecord(models.Model):
     id=models.CharField(max_length=64,primary_key=True)
