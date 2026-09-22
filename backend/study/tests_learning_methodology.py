@@ -9,7 +9,7 @@ from knowledge.models import Content,CourseDiscipline,Discipline,DisciplineConte
 from .advanced_services import queue_review,rate_review
 from .intelligence_services import learning_intelligence
 from .learning_services import learning_plan
-from .models import SimulationRecord,StudyAnswer,StudyContentProgress,StudyReviewItem,StudySyllabusSnapshot
+from .models import LearningIntelligenceSettings,SimulationRecord,StudyAnswer,StudyContentProgress,StudyReviewItem,StudySyllabusSnapshot
 
 
 class LearningMethodologyTests(TestCase):
@@ -149,7 +149,7 @@ class LearningMethodologyTests(TestCase):
         )
         answers=[
             StudyAnswer.objects.create(
-                user=self.user,question_id=f"central-{self.question.pk}",correct=True,confidence=3,
+                user=self.user,course=self.course,question_id=f"central-{self.question.pk}",correct=True,confidence=3,
             )
             for _ in range(5)
         ]
@@ -166,12 +166,12 @@ class LearningMethodologyTests(TestCase):
             "id":"sim-real-telemetry",
             "courseId":self.course.id,
             "mode":"real_exam",
-            "total":2,
-            "correct":1,
-            "errors":1,
+            "total":10,
+            "correct":5,
+            "errors":5,
             "elapsedSeconds":75,
-            "byDiscipline":{"Constitucional":{"correct":1,"total":2}},
-            "byBlock":{"I":{"correct":1,"total":2}},
+            "byDiscipline":{"Constitucional":{"correct":5,"total":10}},
+            "byBlock":{"I":{"correct":5,"total":10}},
             "questionIds":["a","b"],
             "answers":[
                 {"questionId":"a","correct":True,"confidence":3},
@@ -189,3 +189,103 @@ class LearningMethodologyTests(TestCase):
         self.assertEqual(record.telemetry_json["summary"]["answerChanges"],1)
         self.assertEqual(record.telemetry_json["summary"]["highConfidenceErrors"],1)
         self.assertEqual(record.telemetry_json["summary"]["performanceDrop"],100)
+
+
+    def test_learning_features_are_exposed_per_course(self):
+        client=APIClient();client.force_authenticate(self.user)
+        response=client.get(f"/api/v1/study/learning-features/?courseId={self.course.id}")
+        self.assertEqual(response.status_code,200)
+        self.assertTrue(response.data["enabled"])
+        self.assertTrue(response.data["domainProofEnabled"])
+        self.assertEqual(response.data["realExamMinQuestions"],10)
+
+    def test_root_can_disable_intelligence_for_students(self):
+        admin_client=APIClient();admin_client.force_authenticate(self.admin)
+        response=admin_client.put("/api/v1/study/admin/intelligence-settings/",{
+            "courseId":self.course.id,
+            "enabled":False,
+            "radarEnabled":True,
+            "errorCoachEnabled":True,
+            "domainProofEnabled":True,
+            "masteryMapEnabled":True,
+            "realExamEnabled":True,
+            "telemetryEnabled":True,
+            "diagnosticMinAnswers":5,
+            "domainProofQuestionCount":10,
+            "realExamMinQuestions":10,
+            "realExamQuestionCount":60,
+            "validatingScoreThreshold":60,
+            "retainedScoreThreshold":80,
+            "retentionMinCorrectDays":2,
+            "retentionMinSpanDays":2,
+            "retainedRecheckDays":14,
+        },format="json")
+        self.assertEqual(response.status_code,200)
+        self.assertFalse(response.data["enabled"])
+        student=APIClient();student.force_authenticate(self.user)
+        features=student.get(f"/api/v1/study/learning-features/?courseId={self.course.id}")
+        self.assertFalse(features.data["enabled"])
+        intelligence=student.get(f"/api/v1/study/intelligence/?courseId={self.course.id}")
+        self.assertEqual(intelligence.status_code,403)
+
+    def test_domain_proof_is_rejected_when_disabled(self):
+        settings,_=LearningIntelligenceSettings.objects.get_or_create(course=self.course)
+        settings.domain_proof_enabled=False;settings.save(update_fields=["domain_proof_enabled","updated_at"])
+        client=APIClient();client.force_authenticate(self.user)
+        response=client.post("/api/v1/study/simulation/",{
+            "id":"domain-disabled","courseId":self.course.id,"mode":"domain",
+            "total":3,"correct":2,"errors":1,"elapsedSeconds":30,
+            "byDiscipline":{},"byBlock":{},"answers":[],"questionIds":[],
+        },format="json")
+        self.assertEqual(response.status_code,400)
+        self.assertIn("desativada",response.data["detail"])
+
+    def test_real_exam_limits_follow_admin_settings(self):
+        settings,_=LearningIntelligenceSettings.objects.get_or_create(course=self.course)
+        settings.real_exam_min_questions=8;settings.real_exam_question_count=20
+        settings.save(update_fields=["real_exam_min_questions","real_exam_question_count","updated_at"])
+        client=APIClient();client.force_authenticate(self.user)
+        response=client.post("/api/v1/study/simulation/",{
+            "id":"real-too-short","courseId":self.course.id,"mode":"real_exam",
+            "total":5,"correct":3,"errors":2,"elapsedSeconds":30,
+            "byDiscipline":{},"byBlock":{},"answers":[],"questionIds":[],
+        },format="json")
+        self.assertEqual(response.status_code,400)
+        self.assertIn("limites",response.data["detail"])
+
+    def test_telemetry_can_be_disabled_without_disabling_real_exam(self):
+        settings,_=LearningIntelligenceSettings.objects.get_or_create(course=self.course)
+        settings.telemetry_enabled=False;settings.real_exam_min_questions=5;settings.real_exam_question_count=20
+        settings.save(update_fields=["telemetry_enabled","real_exam_min_questions","real_exam_question_count","updated_at"])
+        client=APIClient();client.force_authenticate(self.user)
+        response=client.post("/api/v1/study/simulation/",{
+            "id":"real-no-telemetry","courseId":self.course.id,"mode":"real_exam",
+            "total":5,"correct":3,"errors":2,"elapsedSeconds":45,
+            "byDiscipline":{},"byBlock":{},"answers":[],"questionIds":[],
+            "telemetry":{"questions":[{"questionId":"x","elapsedMs":10000,"changes":4,"confidence":3,"correct":False}]},
+        },format="json")
+        self.assertEqual(response.status_code,200)
+        record=SimulationRecord.objects.get(pk="real-no-telemetry")
+        self.assertEqual(record.telemetry_json,{"questions":[],"summary":{}})
+
+    def test_answer_is_saved_with_course_context(self):
+        client=APIClient();client.force_authenticate(self.user)
+        response=client.post("/api/v1/study/answer/",{
+            "courseId":self.course.id,
+            "questionId":f"central-{self.question.pk}",
+            "correct":True,
+            "confidence":3,
+        },format="json")
+        self.assertEqual(response.status_code,200)
+        saved=StudyAnswer.objects.filter(user=self.user).latest("id")
+        self.assertEqual(saved.course,self.course)
+
+    def test_admin_rejects_incoherent_mastery_thresholds(self):
+        client=APIClient();client.force_authenticate(self.admin)
+        response=client.put("/api/v1/study/admin/intelligence-settings/",{
+            "courseId":self.course.id,
+            "validatingScoreThreshold":85,
+            "retainedScoreThreshold":80,
+        },format="json")
+        self.assertEqual(response.status_code,400)
+        self.assertIn("retido",response.data["detail"])
