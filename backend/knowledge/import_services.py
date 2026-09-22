@@ -3,6 +3,8 @@ import re
 import zipfile
 from io import BytesIO
 
+from django.core.exceptions import ValidationError
+from django.core.validators import URLValidator
 from django.db import transaction
 from openpyxl import Workbook,load_workbook
 from openpyxl.styles import Alignment,Font,PatternFill
@@ -84,6 +86,15 @@ def _safe_type(value):
     qtype=TYPE_ALIASES.get(_norm(value) or "certo_errado")
     if not qtype:raise ValueError("tipo inválido")
     return qtype
+
+
+def _safe_url(value,label):
+    url=_clean(value)
+    if not url:return ""
+    if not re.match(r"^https?://",url,re.I):raise ValueError(f"{label} deve começar com http:// ou https://")
+    try:URLValidator(schemes=["http","https"])(url)
+    except ValidationError as exc:raise ValueError(f"{label} inválido") from exc
+    return url[:2048]
 
 
 def _check_upload(upload,max_bytes,extensions):
@@ -245,8 +256,8 @@ def parse_content_xlsx(upload):
             result.append({"row":row_number,"valid":not duplicate,"skip":duplicate,"errors":[],"warnings":warnings,"data":{
                 "title":title,"objective":_clean(row.get("objetivo")),"description":_clean(row.get("descricao")),
                 "card_text":_clean(row.get("resumo_card")),"body":_clean(row.get("corpo")),
-                "cover_image_url":_clean(row.get("capa_url"))[:2048],"video_url":_clean(row.get("video_url"))[:2048],
-                "video_label":_clean(row.get("video_rotulo"))[:160],"material_url":_clean(row.get("material_url"))[:2048],
+                "cover_image_url":_safe_url(row.get("capa_url"),"capa_url"),"video_url":_safe_url(row.get("video_url"),"video_url"),
+                "video_label":_clean(row.get("video_rotulo"))[:160],"material_url":_safe_url(row.get("material_url"),"material_url"),
                 "material_label":_clean(row.get("material_rotulo"))[:160],"notice_kind":None if notice_kind=="None" else notice_kind,
                 "status":_safe_status(row.get("status")),"requires_review":_bool(row.get("exigir_revisao")),
                 "discipline_ids":discipline_ids,
@@ -304,10 +315,25 @@ def pdf_to_content(upload,metadata):
     missing=set(discipline_ids)-set(Discipline.objects.filter(id__in=discipline_ids).values_list("id",flat=True))
     if missing:raise ValueError("Disciplina(s) inexistente(s): "+", ".join(map(str,sorted(missing))))
     duplicate=Content.objects.filter(title__iexact=title).exists()
+    notice_raw=_clean(metadata.get("noticeKind")) or marker("AVISO")
+    notice_key=_norm(notice_raw)
+    notice_kind={"novo":"new","new":"new","atualizado":"updated","updated":"updated","":"None","nenhum":"None"}.get(notice_key)
+    if notice_kind is None:raise ValueError("aviso deve ser NENHUM, NOVO ou ATUALIZADO")
     return {
-        "title":title[:220],"objective":_clean(metadata.get("objective")) or marker("OBJETIVO"),"description":_clean(metadata.get("description")) or marker("DESCRICAO"),
-        "card_text":_clean(metadata.get("cardText")) or marker("RESUMO_CARD"),"body":structured_body or body,"status":_safe_status(metadata.get("status")),
-        "requires_review":_bool(metadata.get("requiresReview")),"discipline_ids":discipline_ids,"duplicate":duplicate,
+        "title":title[:220],
+        "objective":_clean(metadata.get("objective")) or marker("OBJETIVO"),
+        "description":_clean(metadata.get("description")) or marker("DESCRICAO"),
+        "card_text":_clean(metadata.get("cardText")) or marker("RESUMO_CARD"),
+        "body":structured_body or body,
+        "cover_image_url":_safe_url(_clean(metadata.get("coverImageUrl")) or marker("CAPA_URL"),"capa_url"),
+        "video_url":_safe_url(_clean(metadata.get("videoUrl")) or marker("VIDEO_URL"),"video_url"),
+        "video_label":(_clean(metadata.get("videoLabel")) or marker("VIDEO_ROTULO"))[:160],
+        "material_url":_safe_url(_clean(metadata.get("materialUrl")) or marker("MATERIAL_URL"),"material_url"),
+        "material_label":(_clean(metadata.get("materialLabel")) or marker("MATERIAL_ROTULO"))[:160],
+        "notice_kind":None if notice_kind=="None" else notice_kind,
+        "status":_safe_status(metadata.get("status")),
+        "requires_review":_bool(metadata.get("requiresReview")),
+        "discipline_ids":discipline_ids,"duplicate":duplicate,
         "pages":len(reader.pages),"characters":len(body),
     }
 
