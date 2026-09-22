@@ -63,6 +63,8 @@ type LearningPlan = {
   weaknesses: { discipline: string; accuracy: number; correct: number; total: number }[];
   metrics: { readiness: number; progressPercent: number; reviewHealth: number; questionsThisWeek: number; questionGoal: number; studyDaysThisWeek: number; studyDayGoal: number; examDays?: number | null; intensity?: "base" | "acelerado" | "reta_final" };
   metacognition: { sample: number; score: number | null; label: "coletando" | "excesso_de_confianca" | "subestimando" | "calibrada"; overconfident: number; underconfident: number; tip: string };
+  interleaving: { disciplines: string[]; principle: string };
+  sessionPlan: { totalMinutes: number; intensity: "base" | "acelerado" | "reta_final"; blocks: { type: string; minutes: number; label: string; detail: string }[] };
 };
 type StudyProgressItem = { id: number; disciplineId: number; disciplineName: string; title: string; description: string | null; objective: string | null; cardText: string | null; body: string | null; coverImageUrl: string | null; videoUrl: string | null; videoLabel: string | null; materialUrl: string | null; materialLabel: string | null; notice: { kind: "new" | "updated"; label: string; activatedAt: string } | null; progress: { status: "started" | "completed"; startedAt: string; lastOpenedAt: string; completedAt: string | null } | null };
 type RoadmapItem = { id: number; contentId: number; disciplineId: number; disciplineName: string; weekday: number; startTime: string; isActive: boolean; content: Omit<StudyProgressItem, "progress" | "notice"> };
@@ -359,14 +361,14 @@ function StudyWorkspace({ user, logout, initialView, initialCommercePlanId, onCo
     else setView("Conteúdo");
   }
 
-  function startSimulation(total: number) {
+  function startSimulation(total: number, focusDiscipline?: string) {
     setSimulationResult(null);
     setSimulationNotice(null);
     const strictReviewMode = centralQuestionsQuery.data?.requiresReviewMode === true;
-    const bank = persistentSimulationQuestions;
+    const bank = focusDiscipline ? persistentSimulationQuestions.filter(item => item.discipline === focusDiscipline) : persistentSimulationQuestions;
     const questions = selectBalancedBooleanQuestions(bank, total, state.usedQuestionIds);
     if (questions.length < total) {
-      setSimulationNotice(strictReviewMode ? `Há somente ${questions.length} questão(ões) central(is) aprovada(s)/publicada(s) para revisão obrigatória. Publique ao menos ${total} para iniciar este simulado.` : `Há somente ${questions.length} questões disponíveis para este simulado.`);
+      setSimulationNotice(focusDiscipline ? `Há somente ${questions.length} questão(ões) disponíveis em ${focusDiscipline}. Reduza o treino focal ou publique mais questões dessa disciplina.` : strictReviewMode ? `Há somente ${questions.length} questão(ões) central(is) aprovada(s)/publicada(s) para revisão obrigatória. Publique ao menos ${total} para iniciar este simulado.` : `Há somente ${questions.length} questões disponíveis para este simulado.`);
       return;
     }
     setSimulation({ questions, index: 0, answers: {}, confidences: {}, startedAt: Date.now() });
@@ -621,6 +623,7 @@ function Dashboard({ state, modules, contestName, coverImageUrl, panelLabel, pan
         </button>)}
       </div>
     </section>}
+    {learningPlan&&<section className="shell-card p-5 sm:p-6"><div className="section-heading"><div><p className="eyebrow">SESSÃO RECOMENDADA · {learningPlan.sessionPlan.totalMinutes} MIN</p><h3 className="font-display mt-1 text-xl font-extrabold text-[#173d4a]">{learningPlan.sessionPlan.intensity==="reta_final"?"Reta final: mais prática e recuperação":learningPlan.sessionPlan.intensity==="acelerado"?"Ciclo acelerado":"Ciclo equilibrado"}</h3><p className="mt-2 max-w-2xl text-sm leading-6 text-[#64777a]">{learningPlan.interleaving.principle}{learningPlan.interleaving.disciplines.length ? " Hoje, alterne: " + learningPlan.interleaving.disciplines.join(" → ") + "." : ""}</p></div><Clock3 className="hidden h-6 w-6 text-[#0e5a70] sm:block"/></div><div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{learningPlan.sessionPlan.blocks.map((block,index)=><article key={block.label} className="rounded-2xl border border-[#dfe9e5] bg-[#fbfdfc] p-4"><div className="flex items-center justify-between"><span className="grid h-8 w-8 place-items-center rounded-xl bg-[#e9f4f1] text-xs font-extrabold text-[#0e5a70]">{index+1}</span><span className="font-display text-lg font-extrabold text-[#0e5a70]">{block.minutes}m</span></div><h4 className="font-display mt-3 font-extrabold text-[#274650]">{block.label}</h4><p className="mt-1 text-xs leading-5 text-[#6d7d80]">{block.detail}</p></article>)}</div></section>}
     {learningPlan && <section className="soft-panel p-5 sm:p-6"><div className="grid gap-4 lg:grid-cols-[auto_1fr_auto] lg:items-center"><div className="grid h-12 w-12 place-items-center rounded-2xl bg-white text-[#0e5a70] shadow-sm"><Brain className="h-6 w-6"/></div><div><p className="eyebrow">METACOGNIÇÃO · SUA PERCEPÇÃO</p><h3 className="font-display mt-1 text-lg font-extrabold text-[#24434d]">{learningPlan.metacognition.sample<5?"Calibrando sua confiança":learningPlan.metacognition.label==="excesso_de_confianca"?"Cuidado com a falsa sensação de domínio":learningPlan.metacognition.label==="subestimando"?"Você sabe mais do que imagina":"Sua confiança está bem calibrada"}</h3><p className="mt-2 text-xs leading-5 text-[#64777a]">{learningPlan.metacognition.tip}</p></div><div className="rounded-2xl border border-[#dbe7e3] bg-white px-4 py-3 text-center"><p className="text-[9px] font-bold uppercase tracking-[.12em] text-[#7a898c]">Calibração</p><p className="font-display mt-1 text-2xl font-extrabold text-[#0e5a70]">{learningPlan.metacognition.score===null?"—":`${learningPlan.metacognition.score}%`}</p><p className="text-[9px] text-[#7b898c]">{learningPlan.metacognition.sample} resposta(s)</p></div></div></section>}
 
     <section className="grid gap-4 xl:grid-cols-[1.15fr_.85fr]">
@@ -704,7 +707,7 @@ function QuickCheck({ question, answer, correct, reviewSaved, reviewPending, onA
   </div>;
 }
 
-function Simulations({ onStart, state, learningPlan, notice, strictReviewMode, centralCount }: { onStart: (size: number) => void; state: StudyState; learningPlan: LearningPlan | null; notice: string | null; strictReviewMode: boolean; centralCount: number }) {
+function Simulations({ onStart, state, learningPlan, notice, strictReviewMode, centralCount }: { onStart: (size: number, focusDiscipline?: string) => void; state: StudyState; learningPlan: LearningPlan | null; notice: string | null; strictReviewMode: boolean; centralCount: number }) {
   const last=state.simulations.at(-1); const best=state.simulations.length?Math.max(...state.simulations.map(sim=>percentage(sim.correct,sim.total))):0;
   const recommendedSize=learningPlan?.dueReviews.length?10:(learningPlan?.metrics.readiness??0)>=80?60:(learningPlan?.metrics.readiness??0)>=55?20:10;
   const modes=[{size:10,label:"Diagnóstico",detail:"Rápido · identifica lacunas"},{size:20,label:"Treino de domínio",detail:"Consolida conteúdo e ritmo"},{size:60,label:"Prova completa",detail:"Resistência e estratégia"}];
@@ -718,6 +721,7 @@ function Simulations({ onStart, state, learningPlan, notice, strictReviewMode, c
         </div>
       </div>
     </section>}
+    {learningPlan?.weaknesses?.[0]&&<section className="rounded-2xl border border-[#c9dfd8] bg-[#f4faf8] p-4 sm:p-5"><div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><p className="eyebrow">TREINO FOCAL</p><h3 className="font-display mt-1 text-lg font-extrabold text-[#24434d]">{learningPlan.weaknesses[0].discipline} · {learningPlan.weaknesses[0].accuracy}%</h3><p className="mt-1 text-xs leading-5 text-[#64777a]">Faça um bloco curto só nessa matéria e depois volte ao simulado misto. O objetivo é corrigir a fraqueza sem perder a capacidade de alternar contextos.</p></div><button onClick={()=>onStart(10,learningPlan.weaknesses[0].discipline)} className="action-button shrink-0">Treinar 10 questões</button></div></section>}
     <section className="grid grid-cols-2 gap-3 lg:grid-cols-4"><Metric icon={History} label="Simulados" value={state.simulations.length.toString()} detail="concluídos" tone="teal"/><Metric icon={Gauge} label="Melhor nota" value={`${best}%`} detail="seu recorde" tone="blue"/><Metric icon={Target} label="Último resultado" value={last?`${percentage(last.correct,last.total)}%`:"—"} detail={last?`${last.correct}/${last.total} acertos`:"faça o primeiro"} tone="amber"/><Metric icon={Clock3} label="Último tempo" value={last?formatTime(last.elapsedSeconds):"—"} detail="tempo total" tone="orange"/></section>
     <section className="grid gap-3 md:grid-cols-3">{blocks.map(block=><article key={block.id} className="shell-card p-5"><div className="flex items-center justify-between"><span className="eyebrow">{block.label}</span><span className="font-display text-2xl font-extrabold text-[#0e5a70]">{Math.round(block.ratio*100)}%</span></div><p className="mt-3 text-sm font-bold text-[#2d4b53]">{block.description}</p><p className="mt-1 text-xs text-[#738286]">{block.items} itens na prova completa</p><div className="mt-4 h-2 overflow-hidden rounded-full bg-[#e7efec]"><div className="h-full rounded-full bg-[#0e5a70]" style={{width:`${block.ratio*100}%`}}/></div></article>)}</section>
     <section className="soft-panel p-5"><div className="flex items-start gap-3"><ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-[#0e5a70]"/><div><h3 className="font-display font-extrabold text-[#24434d]">Como aproveitar melhor</h3><p className="mt-1 text-sm leading-6 text-[#64777a]">Faça simulados menores durante a semana e use os maiores para medir resistência, tempo e estabilidade do desempenho. Seus erros alimentam a área de revisão.</p></div></div></section>
