@@ -69,3 +69,34 @@ class LearningMethodologyTests(TestCase):
         plan=learning_plan(self.user,self.course)
         self.assertEqual(plan["metrics"]["examDays"],21)
         self.assertEqual(plan["metrics"]["intensity"],"reta_final")
+
+
+    def test_learning_plan_builds_interleaved_session(self):
+        plan=learning_plan(self.user,self.course)
+        self.assertEqual(plan["sessionPlan"]["totalMinutes"],50)
+        self.assertEqual(plan["sessionPlan"]["intensity"],"base")
+        self.assertEqual(sum(block["minutes"] for block in plan["sessionPlan"]["blocks"]),50)
+        self.assertIn("Constitucional",plan["interleaving"]["disciplines"])
+
+    def test_confidence_is_saved_and_used_for_metacognition(self):
+        client=APIClient();client.force_authenticate(self.user)
+        for _ in range(5):
+            response=client.post("/api/v1/study/answer/",{
+                "questionId":f"central-{self.question.pk}",
+                "correct":False,
+                "confidence":3,
+            },format="json")
+            self.assertEqual(response.status_code,200)
+        plan=learning_plan(self.user,self.course)
+        self.assertEqual(plan["metacognition"]["sample"],5)
+        self.assertEqual(plan["metacognition"]["label"],"excesso_de_confianca")
+        self.assertEqual(plan["metacognition"]["overconfident"],5)
+
+    def test_invalid_confidence_is_rejected(self):
+        client=APIClient();client.force_authenticate(self.user)
+        response=client.post("/api/v1/study/answer/",{
+            "questionId":f"central-{self.question.pk}",
+            "correct":True,
+            "confidence":5,
+        },format="json")
+        self.assertEqual(response.status_code,400)

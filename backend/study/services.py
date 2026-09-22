@@ -14,7 +14,7 @@ def state(user):
     p=profile(user);sims=list(SimulationRecord.objects.filter(user=user).select_related("reflection").order_by("completed_at"))
     week_start=timezone.now()-timedelta(days=7)
     return {"completedModules":[x.module_id for x in CompletedModule.objects.filter(user=user)],
-    "answers":[{"questionId":x.question_id,"correct":x.correct,"answeredAt":x.answered_at.isoformat()} for x in StudyAnswer.objects.filter(user=user).order_by("answered_at")],
+    "answers":[{"questionId":x.question_id,"correct":x.correct,"confidence":x.confidence,"answeredAt":x.answered_at.isoformat()} for x in StudyAnswer.objects.filter(user=user).order_by("answered_at")],
     "simulations":[{"id":x.id,"date":x.completed_at.isoformat(),"total":x.total,"correct":x.correct,"errors":x.errors,"elapsedSeconds":x.elapsed_seconds,"byDiscipline":x.by_discipline,"byBlock":x.by_block,"reflection":_reflection_payload(x)} for x in sims],
     "xp":p.xp,"lastStudyDate":p.last_study_date.isoformat() if p.last_study_date else None,"studyDates":p.study_dates,"usedQuestionIds":p.used_question_ids,
     "weeklySimulationCorrect":sum(x.correct for x in sims if x.completed_at>=week_start)}
@@ -22,8 +22,8 @@ def activity(user,xp,questions=()):
     p=profile(user);today=date.today();p.xp+=max(0,int(xp));p.last_study_date=today
     p.study_dates=list(dict.fromkeys([*p.study_dates,today.isoformat()]));p.used_question_ids=list(dict.fromkeys([*p.used_question_ids,*[str(q) for q in questions]]));p.save()
 @transaction.atomic
-def answer(user,qid,correct):
-    StudyAnswer.objects.create(user=user,question_id=qid,correct=correct);activity(user,8 if correct else 2);return state(user)
+def answer(user,qid,correct,confidence=None):
+    StudyAnswer.objects.create(user=user,question_id=qid,correct=correct,confidence=confidence);activity(user,8 if correct else 2);return state(user)
 @transaction.atomic
 def complete(user,module):
     _,created=CompletedModule.objects.get_or_create(user=user,module_id=module)
@@ -42,7 +42,15 @@ def submit_simulation(user,data):
     record=SimulationRecord.objects.create(id=sid,user=user,total=total,correct=correct,errors=errors,elapsed_seconds=max(0,int(data.get("elapsedSeconds") or 0)),
         by_discipline=dict(data.get("byDiscipline") or {}),by_block=dict(data.get("byBlock") or {}))
     answers=list(data.get("answers") or [])
-    StudyAnswer.objects.bulk_create([StudyAnswer(user=user,question_id=str(item.get("questionId") or "")[:80],correct=bool(item.get("correct"))) for item in answers if item.get("questionId") is not None])
+    StudyAnswer.objects.bulk_create([
+        StudyAnswer(
+            user=user,
+            question_id=str(item.get("questionId") or "")[:80],
+            correct=bool(item.get("correct")),
+            confidence=int(item.get("confidence")) if str(item.get("confidence") or "").isdigit() and 1<=int(item.get("confidence"))<=3 else None,
+        )
+        for item in answers if item.get("questionId") is not None
+    ])
     snapshots=[]
     for position,item in enumerate(list(data.get("persistentAnswers") or []),1):
         question=Question.objects.filter(pk=item.get("questionId")).first()
