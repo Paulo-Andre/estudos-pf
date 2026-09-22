@@ -9,6 +9,7 @@ from knowledge.models import Content,Discipline,Question
 from knowledge.services import can_use_question,question_payload
 from .advanced_services import course_progress_payload,daily_quick_check,dismiss_daily_quick_check,mark_content_opened,mark_review_mastered,queue_review,rate_review,remove_review_item,remove_roadmap_item,resume_content,roadmap_payload,save_roadmap_item
 from .models import SimulationRecord,SimulationReflection,StudyBookmark,StudyNote,StudyReviewItem,StudyRoadmapItem
+from .intelligence_services import learning_intelligence
 from .learning_services import learning_plan,queue_question_error
 from .services import answer,complete,simulation_detail,state,submit_simulation
 
@@ -190,6 +191,13 @@ class LearningPlanView(APIView):
     def get(self,request):
         course=get_object_or_404(Course,pk=request.query_params.get("courseId"))
         try:return Response(learning_plan(request.user,course))
+        except PermissionError as exc:return Response({"detail":str(exc)},status=403)
+
+class LearningIntelligenceView(APIView):
+    permission_classes=[HasStudyAccess]
+    def get(self,request):
+        course=get_object_or_404(Course,pk=request.query_params.get("courseId"))
+        try:return Response(learning_intelligence(request.user,course))
         except PermissionError as exc:return Response({"detail":str(exc)},status=403)
 
 
