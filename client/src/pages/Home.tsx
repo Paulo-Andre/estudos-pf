@@ -25,7 +25,7 @@ import { CourseMarketplace } from "@/components/CourseMarketplace";
 import { RootManagementPanel, RootManagementSection } from "@/components/RootManagementPanel";
 import { GlobalContactLinks } from "@/components/GlobalContactLinks";
 import { CourseAccessRequired } from "@/components/CourseAccessRequired";
-import { IntelligenceArea, type IntelligenceTopic, type LearningIntelligence } from "@/components/IntelligenceArea";
+import { IntelligenceArea, type IntelligenceTopic, type LearningFeatures, type LearningIntelligence } from "@/components/IntelligenceArea";
 import { StudentAlerts } from "@/components/StudentAlerts";
 import { RichContentBody } from "@/components/RichContentBody";
 import { Textarea } from "@/components/ui/textarea";
@@ -56,7 +56,7 @@ type RestQuestion = {
 type SimulationQuestion = StudyQuestion & { persistentQuestionId?: number };
 type SimulationMode = "practice" | "domain" | "real_exam";
 type SimulationTelemetryItem = { questionId: string; elapsedMs: number; changes: number; confidence: number | null; correct: boolean; discipline: string; subject: string };
-type ActiveSimulation = { questions: SimulationQuestion[]; index: number; answers: Record<string, boolean>; confidences: Record<string, number>; startedAt: number; questionStartedAt: number; mode: SimulationMode; telemetry: Record<string, SimulationTelemetryItem> } | null;
+type ActiveSimulation = { questions: SimulationQuestion[]; index: number; answers: Record<string, boolean>; confidences: Record<string, number>; startedAt: number; questionStartedAt: number; mode: SimulationMode; telemetryEnabled: boolean; telemetry: Record<string, SimulationTelemetryItem> } | null;
 type PersonalReviewItem = { id: number; questionKey: string; snapshot: { statement: string; answer: boolean; explanation: string; discipline: string; subject: string; source?: string }; status: "pending" | "mastered"; createdAt: string; reviewedAt: string | null; source?: string; dueAt?: string | null; intervalDays?: number; repetitions?: number; lapseCount?: number; lastRating?: "again" | "hard" | "good" | "easy" | "" };
 type LearningPlan = {
   method: { name: string; steps: { id: "learn" | "practice" | "review" | "simulate"; label: string; principle: string; status: string }[] };
@@ -184,7 +184,7 @@ function StudyWorkspace({ user, logout, initialView, initialCommercePlanId, onCo
   const activeCourseTitle = activeCourse?.title ?? activeContest?.name ?? "Curso de estudo";
   const activeCourseRole = activeContest?.role ?? (activeCourse?.courseType === "tutorial" ? "Tutorial" : activeCourse?.track ?? "Trilha de estudo");
   const tutorialCourse = isTutorialCourseExperience(user.role, activeCourse?.courseType);
-  const visibleNavigation = navigation.filter(item => canOpenTutorialView(item.label, tutorialCourse));
+  const tutorialNavigation = navigation.filter(item => canOpenTutorialView(item.label, tutorialCourse));
   const canUseActiveCourse = hasConfirmedCourseAccess && (user.role === "admin" || permittedContestIds.includes(effectiveContestId));
   const studyBundleQuery = (trpc.study as any).bundle.useQuery({ courseId: effectiveContestId }, { enabled: canUseActiveCourse, refetchOnWindowFocus: false });
   const availableModules = useMemo<StudyModule[]>(() => {
@@ -230,7 +230,10 @@ function StudyWorkspace({ user, logout, initialView, initialCommercePlanId, onCo
   const personalReviewsQuery = (trpc.study.review.list as any).useQuery({ dueOnly: true }, { enabled: hasConfirmedCourseAccess && !tutorialCourse, refetchOnWindowFocus: false });
   const contentProgressQuery = trpc.study.contentProgress.get.useQuery({ courseId: effectiveContestId }, { enabled: canUseActiveCourse, refetchOnWindowFocus: false });
   const learningPlanQuery = trpc.study.learningPlan.useQuery({ courseId: effectiveContestId }, { enabled: canUseActiveCourse, refetchOnWindowFocus: false });
-  const learningIntelligenceQuery = (trpc.study as any).learningIntelligence.useQuery({ courseId: effectiveContestId }, { enabled: canUseActiveCourse && !tutorialCourse, refetchOnWindowFocus: false });
+  const learningFeaturesQuery = (trpc.study as any).learningFeatures.useQuery({ courseId: effectiveContestId }, { enabled: canUseActiveCourse && !tutorialCourse, refetchOnWindowFocus: false });
+  const learningFeatures = (learningFeaturesQuery.data ?? null) as LearningFeatures | null;
+  const visibleNavigation = tutorialNavigation.filter(item => item.label !== "Inteligência" || learningFeatures?.enabled === true);
+  const learningIntelligenceQuery = (trpc.study as any).learningIntelligence.useQuery({ courseId: effectiveContestId }, { enabled: canUseActiveCourse && !tutorialCourse && learningFeatures?.enabled === true, refetchOnWindowFocus: false });
   const roadmapQuery = trpc.study.roadmap.list.useQuery({ courseId: effectiveContestId }, { enabled: canUseActiveCourse, refetchOnWindowFocus: false });
   const personalCompetitionScoreQuery = trpc.competition.myScore.useQuery({}, { enabled: canUseActiveCourse && !tutorialCourse, refetchOnWindowFocus: false });
   const answerMutation = trpc.study.answer.useMutation();
@@ -320,11 +323,11 @@ function StudyWorkspace({ user, logout, initialView, initialCommercePlanId, onCo
     updateState((current) => ({
       ...current,
       xp: current.xp + (correct ? 8 : 2),
-      answers: [...current.answers, { questionId: question.id, correct, answeredAt: new Date().toISOString() }],
+      answers: [...current.answers, { questionId: question.id, courseId: effectiveContestId, correct, confidence, answeredAt: new Date().toISOString() }],
       studyDates: current.studyDates.includes(today) ? current.studyDates : [...current.studyDates, today],
       lastStudyDate: today,
     }));
-    answerMutation.mutate({ questionId: question.id, correct, confidence } as any, { onSuccess: serverState => { setState(serverState as StudyState); void personalReviewsQuery.refetch(); void learningPlanQuery.refetch(); } });
+    answerMutation.mutate({ courseId: effectiveContestId, questionId: question.id, correct, confidence } as any, { onSuccess: serverState => { setState(serverState as StudyState); void personalReviewsQuery.refetch(); void learningPlanQuery.refetch(); if (learningFeatures?.enabled) void learningIntelligenceQuery.refetch(); } });
   }
 
   function addToPersonalReview(question: StudyQuestion) {
@@ -381,7 +384,7 @@ function StudyWorkspace({ user, logout, initialView, initialCommercePlanId, onCo
       return;
     }
     const now = Date.now();
-    setSimulation({ questions, index: 0, answers: {}, confidences: {}, startedAt: now, questionStartedAt: now, mode, telemetry: {} });
+    setSimulation({ questions, index: 0, answers: {}, confidences: {}, startedAt: now, questionStartedAt: now, mode, telemetryEnabled: mode !== "real_exam" || learningFeatures?.telemetryEnabled !== false, telemetry: {} });
   }
 
   function submitSimulationAnswer(answer: boolean, confidence: number, itemTelemetry?: { elapsedMs: number; changes: number }) {
@@ -423,7 +426,7 @@ function StudyWorkspace({ user, logout, initialView, initialCommercePlanId, onCo
       if (isCorrect) byDiscipline[item.discipline].correct += 1;
       byBlock[item.block].total += 1;
       if (isCorrect) byBlock[item.block].correct += 1;
-      answerRecords.push({ questionId: item.id, correct: isCorrect, confidence: nextConfidences[item.id] ?? null, answeredAt: new Date().toISOString() });
+      answerRecords.push({ questionId: item.id, courseId: effectiveContestId, correct: isCorrect, confidence: nextConfidences[item.id] ?? null, answeredAt: new Date().toISOString() });
     });
 
     const telemetryQuestions = simulation.questions.map(item => nextTelemetry[item.id]).filter(Boolean) as SimulationTelemetryItem[];
