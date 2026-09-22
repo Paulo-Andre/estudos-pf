@@ -7,7 +7,7 @@ from django.db import IntegrityError,transaction
 from django.utils import timezone
 
 from courses.permissions import has_active_enrollment
-from knowledge.models import CourseDiscipline,DisciplineContent,Question,QuestionContentLink
+from knowledge.models import CourseDiscipline,DisciplineContent,Question
 from .models import SimulationRecord,SimulationReflection,StudyAnswer,StudyContentProgress,StudyReviewItem,StudySyllabusSnapshot
 
 
@@ -66,17 +66,17 @@ def ensure_syllabus_snapshot(course):
     fingerprint=_fingerprint(items)
     existing=StudySyllabusSnapshot.objects.filter(course=course,fingerprint=fingerprint).order_by("-version").first()
     if existing:return existing
-    with transaction.atomic():
-        latest=StudySyllabusSnapshot.objects.select_for_update().filter(course=course).order_by("-version").first()
-        if latest and latest.fingerprint==fingerprint:return latest
-        version=(latest.version if latest else 0)+1
-        summary=_change_summary(latest.items_json if latest else [],items)
-        try:
+    try:
+        with transaction.atomic():
+            latest=StudySyllabusSnapshot.objects.select_for_update().filter(course=course).order_by("-version").first()
+            if latest and latest.fingerprint==fingerprint:return latest
+            version=(latest.version if latest else 0)+1
+            summary=_change_summary(latest.items_json if latest else [],items)
             return StudySyllabusSnapshot.objects.create(
                 course=course,version=version,fingerprint=fingerprint,items_json=items,change_summary_json=summary,
             )
-        except IntegrityError:
-            return StudySyllabusSnapshot.objects.filter(course=course,fingerprint=fingerprint).order_by("-version").first() or StudySyllabusSnapshot.objects.filter(course=course).order_by("-version").first()
+    except IntegrityError:
+        return StudySyllabusSnapshot.objects.filter(course=course,fingerprint=fingerprint).order_by("-version").first() or StudySyllabusSnapshot.objects.filter(course=course).order_by("-version").first()
 
 
 def _question_index(course,content_ids):
@@ -176,7 +176,7 @@ def _error_coach(user,course,items):
         if reflection.primary_cause in {"attention","interpretation"}:counts["attention_interpretation"]+=1
         elif reflection.primary_cause in {"time","strategy"}:counts["time_strategy"]+=1
         elif reflection.primary_cause=="knowledge":counts["knowledge"]+=1
-    lapses=StudyReviewItem.objects.filter(user=user,status="pending",lapse_count__gt=0)
+    lapses=StudyReviewItem.objects.filter(user=user,status="pending",lapse_count__gt=0,question_key__in=list(alias_to_contents.keys()))
     memory_lapses=sum(min(int(item.lapse_count),3) for item in lapses[:100])
     if memory_lapses:counts["memory"]+=memory_lapses
     labels={
