@@ -1,7 +1,7 @@
 /* Estudos PF — lógica de progresso: recompensa domínio demonstrado e preserva histórico local. */
 import { blocks, type Block, type StudyQuestion } from "@/types/study";
 
-export type AnswerRecord = { questionId: string; correct: boolean; answeredAt: string; confidence?: number | null };
+export type AnswerRecord = { questionId: string; courseId?: string | null; correct: boolean; answeredAt: string; confidence?: number | null };
 export type SimulationRecord = {
   id: string;
   date: string;
