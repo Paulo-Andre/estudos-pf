@@ -6,6 +6,7 @@ import { AdminPanel } from "@/components/AdminPanel";
 import { CourseCatalogManagementPanel } from "@/components/CourseCatalogManagementPanel";
 import { GlobalContactSettingsPanel } from "@/components/GlobalContactSettingsPanel";
 import { GlobalSettingsPanel } from "@/components/GlobalSettingsPanel";
+import { LearningIntelligenceAdminPanel } from "@/components/LearningIntelligenceAdminPanel";
 import { StorefrontLivePreview } from "@/components/StorefrontLivePreview";
 import { CompetitionAdminPanel } from "@/components/CompetitionAdminPanel";
 import { AlertAdminPanel } from "@/components/AlertAdminPanel";
@@ -68,6 +69,7 @@ export function RootManagementPanel({ activeSection, onSectionChange, onClose }:
             {activeSection === "security" && <AdminSecurityPanel />}
             {activeSection === "courses" && <CourseCatalogManagementPanel />}
             {activeSection === "contents" && <AdminLibraryPanel embedded />}
+            {activeSection === "learning" && <LearningIntelligenceAdminPanel />}
             {activeSection === "alerts" && <AlertAdminPanel />}
             {activeSection === "contacts" && <GlobalContactSettingsPanel />}
             {activeSection === "settings" && <div className="grid h-full min-h-0 xl:grid-cols-[minmax(0,1fr)_minmax(440px,.9fr)]"><div className="min-h-0"><GlobalSettingsPanel /></div><StorefrontLivePreview /></div>}

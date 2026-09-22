@@ -59,9 +59,9 @@ def queue_question_error(user,question_key,source="answer_error",snapshot=None):
     return queue_review(user,key,snapshot,source=source)
 
 
-def _simulation_metrics(user):
+def _simulation_metrics(user,course):
     totals={}
-    for sim in SimulationRecord.objects.filter(user=user).order_by("-completed_at")[:8]:
+    for sim in SimulationRecord.objects.filter(user=user,course=course).order_by("-completed_at")[:8]:
         for discipline,value in (sim.by_discipline or {}).items():
             metric=totals.setdefault(discipline,{"correct":0,"total":0})
             try:
@@ -78,8 +78,8 @@ def _simulation_metrics(user):
 
 
 
-def _metacognition(user):
-    answers=list(StudyAnswer.objects.filter(user=user,confidence__isnull=False).order_by("-answered_at")[:200])
+def _metacognition(user,course):
+    answers=list(StudyAnswer.objects.filter(user=user,course=course,confidence__isnull=False).order_by("-answered_at")[:200])
     if not answers:
         return {
             "sample":0,"score":None,"label":"coletando","overconfident":0,"underconfident":0,
@@ -110,7 +110,7 @@ def learning_plan(user,course):
     prefs,_=AccountPreferences.objects.get_or_create(user=user)
     today=date.today()
     week_start=today-timedelta(days=today.weekday())
-    questions_week=StudyAnswer.objects.filter(user=user,answered_at__date__gte=week_start).count()
+    questions_week=StudyAnswer.objects.filter(user=user,course=course,answered_at__date__gte=week_start).count()
     profile,_=StudyProfile.objects.get_or_create(user=user)
     days_week=len({str(d) for d in profile.study_dates if str(d)>=week_start.isoformat()})
 
@@ -118,9 +118,9 @@ def learning_plan(user,course):
     due=list(StudyReviewItem.objects.filter(user=user,status="pending").filter(Q(due_at__isnull=True)|Q(due_at__lte=timezone.now())).order_by("due_at","created_at"))
     review_health=100 if not reviews else max(0,round((len(reviews)-len(due))*100/len(reviews)))
 
-    weaknesses=_simulation_metrics(user)
+    weaknesses=_simulation_metrics(user,course)
     weak=weaknesses[0] if weaknesses and weaknesses[0]["accuracy"]<80 else None
-    recent_sim=SimulationRecord.objects.filter(user=user).order_by("-completed_at").first()
+    recent_sim=SimulationRecord.objects.filter(user=user,course=course).order_by("-completed_at").first()
     sim_accuracy=round(recent_sim.correct*100/recent_sim.total) if recent_sim and recent_sim.total else None
     accuracy_values=[row["accuracy"] for row in weaknesses]
     accuracy=round(sum(accuracy_values)/len(accuracy_values)) if accuracy_values else (sim_accuracy if sim_accuracy is not None else 0)
@@ -160,7 +160,7 @@ def learning_plan(user,course):
             {"type":"recap","minutes":5,"label":"Fechamento","detail":"Faça um resumo de memória em poucas frases."},
         ]
 
-    metacognition=_metacognition(user)
+    metacognition=_metacognition(user,course)
 
     recommendations=[]
     if due:

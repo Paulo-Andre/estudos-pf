@@ -1,5 +1,5 @@
-import { BellRing, BookOpenCheck, BriefcaseBusiness, ContactRound, HardDriveDownload, Palette, ShieldAlert, Trophy, UsersRound, type LucideIcon } from "lucide-react";
-export type RootManagementSection = "business" | "students" | "security" | "courses" | "contents" | "alerts" | "contacts" | "settings" | "competition" | "backup";
+import { BellRing, BookOpenCheck, BrainCircuit, BriefcaseBusiness, ContactRound, HardDriveDownload, Palette, ShieldAlert, Trophy, UsersRound, type LucideIcon } from "lucide-react";
+export type RootManagementSection = "business" | "students" | "security" | "courses" | "contents" | "learning" | "alerts" | "contacts" | "settings" | "competition" | "backup";
 
 export type RootManagementSectionDefinition = {
   id: RootManagementSection;
@@ -38,6 +38,12 @@ export const rootManagementSections: RootManagementSectionDefinition[] = [
     label: "Conteúdos",
     description: "Disciplinas, aulas e banco de questões.",
     icon: BookOpenCheck,
+  },
+  {
+    id: "learning",
+    label: "Inteligência de estudo",
+    description: "Radar, domínio, erros e Prova Real por curso.",
+    icon: BrainCircuit,
   },
   {
     id: "alerts",

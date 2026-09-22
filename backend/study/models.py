@@ -25,6 +25,7 @@ class CompletedModule(models.Model):
 class StudyAnswer(models.Model):
     id=models.BigAutoField(primary_key=True)
     user=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.CASCADE,related_name="study_answers")
+    course=models.ForeignKey("courses.Course",on_delete=models.SET_NULL,null=True,blank=True,related_name="study_answers")
     question_id=models.CharField(max_length=80)
     correct=models.BooleanField()
     confidence=models.PositiveSmallIntegerField(null=True,blank=True)
@@ -38,8 +39,14 @@ class StudyAnswer(models.Model):
         ]
 
 class SimulationRecord(models.Model):
+    class Mode(models.TextChoices):
+        PRACTICE="practice","Treino"
+        DOMAIN="domain","Prova de domínio"
+        REAL_EXAM="real_exam","Prova real"
     id=models.CharField(max_length=64,primary_key=True)
     user=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.CASCADE,related_name="simulation_records")
+    course=models.ForeignKey("courses.Course",on_delete=models.SET_NULL,null=True,blank=True,related_name="simulation_records")
+    mode=models.CharField(max_length=16,choices=Mode.choices,default=Mode.PRACTICE)
     completed_at=models.DateTimeField(auto_now_add=True)
     total=models.PositiveIntegerField()
     correct=models.PositiveIntegerField()
@@ -47,6 +54,7 @@ class SimulationRecord(models.Model):
     elapsed_seconds=models.PositiveIntegerField()
     by_discipline=models.JSONField(default=dict)
     by_block=models.JSONField(default=dict)
+    telemetry_json=models.JSONField(default=dict)
 
 class SimulationReflection(models.Model):
     class Cause(models.TextChoices):
@@ -147,3 +155,40 @@ class StudyBookmark(models.Model):
     class Meta:
         constraints=[models.UniqueConstraint(fields=["user","course","content"],name="bookmark_user_course_content_uniq")]
         indexes=[models.Index(fields=["user","-created_at"],name="bookmark_user_created_idx")]
+
+
+class StudySyllabusSnapshot(models.Model):
+    course=models.ForeignKey("courses.Course",on_delete=models.CASCADE,related_name="study_syllabus_snapshots")
+    version=models.PositiveIntegerField()
+    fingerprint=models.CharField(max_length=64)
+    items_json=models.JSONField(default=list)
+    change_summary_json=models.JSONField(default=dict)
+    created_at=models.DateTimeField(auto_now_add=True)
+    class Meta:
+        constraints=[
+            models.UniqueConstraint(fields=["course","version"],name="syllabus_course_version_uniq"),
+            models.UniqueConstraint(fields=["course","fingerprint"],name="syllabus_course_fingerprint_uniq"),
+        ]
+        indexes=[models.Index(fields=["course","-version"],name="syllabus_course_version_idx")]
+
+
+class LearningIntelligenceSettings(models.Model):
+    course=models.OneToOneField("courses.Course",on_delete=models.CASCADE,primary_key=True,related_name="learning_intelligence_settings")
+    is_active=models.BooleanField(default=True)
+    radar_enabled=models.BooleanField(default=True)
+    error_coach_enabled=models.BooleanField(default=True)
+    domain_proof_enabled=models.BooleanField(default=True)
+    mastery_map_enabled=models.BooleanField(default=True)
+    real_exam_enabled=models.BooleanField(default=True)
+    telemetry_enabled=models.BooleanField(default=True)
+    diagnostic_min_answers=models.PositiveSmallIntegerField(default=5)
+    domain_proof_question_count=models.PositiveSmallIntegerField(default=10)
+    real_exam_min_questions=models.PositiveSmallIntegerField(default=10)
+    real_exam_question_count=models.PositiveSmallIntegerField(default=60)
+    validating_score_threshold=models.PositiveSmallIntegerField(default=60)
+    retained_score_threshold=models.PositiveSmallIntegerField(default=80)
+    retention_min_correct_days=models.PositiveSmallIntegerField(default=2)
+    retention_min_span_days=models.PositiveSmallIntegerField(default=2)
+    retained_recheck_days=models.PositiveSmallIntegerField(default=14)
+    updated_by=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.SET_NULL,null=True,blank=True,related_name="+")
+    updated_at=models.DateTimeField(auto_now=True)

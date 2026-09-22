@@ -1,6 +1,8 @@
 from django.db import IntegrityError,transaction
+from django.http import HttpResponse
 from django.db.models import Q
 from rest_framework import permissions,status
+from rest_framework.parsers import FormParser,MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -9,6 +11,7 @@ from courses.models import Course
 from courses.permissions import has_active_enrollment
 from .models import Content,ContentChangelog,CourseDiscipline,Discipline,DisciplineContent,Question,QuestionChangelog,QuestionContentLink,ReviewQueue
 from .services import can_use_question,decide_review,question_payload,submit_for_review
+from .import_services import apply_content_import,apply_pdf_content,apply_question_import,content_template_bytes,import_summary,parse_content_xlsx,parse_question_xlsx,pdf_to_content,question_template_bytes
 
 def discipline_json(d):
     return {"id":d.id,"name":d.name,"shortName":d.short_name,"description":d.description,"status":d.status,
@@ -23,7 +26,15 @@ def content_json(c):
 
 def full_question_json(q):
     payload=question_payload(q)
-    payload["contentIds"]=list(q.content_links.values_list("content_id",flat=True))
+    links=list(q.content_links.select_related("content").prefetch_related("content__discipline_links__discipline"))
+    contents=[link.content for link in links]
+    disciplines=[]
+    for content in contents:
+        for dlink in content.discipline_links.all():
+            if dlink.discipline.name not in disciplines:disciplines.append(dlink.discipline.name)
+    payload["contentIds"]=[content.id for content in contents]
+    payload["discipline"]=disciplines[0] if disciplines else "Biblioteca central"
+    payload["subject"]=" · ".join(content.title for content in contents) or "Conteúdo geral"
     return payload
 
 class CourseLibraryView(APIView):
@@ -129,6 +140,61 @@ class ContentChangelogView(APIView):
     def get(self,request,content_id):
         qs=ContentChangelog.objects.filter(content_id=content_id).order_by("-created_at")[:200]
         return Response([{"id":x.id,"actorUserId":x.actor_id,"changedField":x.changed_field,"oldValue":x.old_value,"newValue":x.new_value,"createdAt":x.created_at} for x in qs])
+
+class AdminImportTemplateView(APIView):
+    permission_classes=[permissions.IsAdminUser]
+    def get(self,request,kind):
+        if kind=="questions":
+            data=question_template_bytes();filename="modelo_importacao_questoes.xlsx"
+        elif kind=="contents":
+            data=content_template_bytes();filename="modelo_importacao_conteudos.xlsx"
+        else:return Response({"detail":"Modelo não encontrado."},status=404)
+        response=HttpResponse(data,content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        response["Content-Disposition"]=f'attachment; filename="{filename}"'
+        response["Cache-Control"]="no-store"
+        return response
+
+class AdminQuestionImportView(APIView):
+    permission_classes=[permissions.IsAdminUser]
+    parser_classes=[MultiPartParser,FormParser]
+    def post(self,request):
+        upload=request.FILES.get("file")
+        if not upload:return Response({"detail":"Selecione um arquivo XLSX."},status=400)
+        dry_run=str(request.data.get("dryRun","true")).lower()!="false"
+        try:
+            rows=parse_question_xlsx(upload)
+            summary=import_summary(rows)
+            if dry_run:return Response({"kind":"questions","fileName":upload.name,"dryRun":True,**summary})
+            if summary["invalidRows"]:
+                return Response({"detail":"Corrija as linhas inválidas antes de confirmar a importação.",**summary},status=400)
+            created=apply_question_import(rows,request.user)
+            return Response({"kind":"questions","fileName":upload.name,"dryRun":False,"createdIds":created,**summary},status=201)
+        except ValueError as exc:return Response({"detail":str(exc)},status=400)
+
+class AdminContentImportView(APIView):
+    permission_classes=[permissions.IsAdminUser]
+    parser_classes=[MultiPartParser,FormParser]
+    def post(self,request):
+        upload=request.FILES.get("file")
+        if not upload:return Response({"detail":"Selecione um arquivo XLSX ou PDF."},status=400)
+        dry_run=str(request.data.get("dryRun","true")).lower()!="false"
+        try:
+            if upload.name.lower().endswith(".xlsx"):
+                rows=parse_content_xlsx(upload);summary=import_summary(rows)
+                if dry_run:return Response({"kind":"contents","format":"xlsx","fileName":upload.name,"dryRun":True,**summary})
+                if summary["invalidRows"]:
+                    return Response({"detail":"Corrija as linhas inválidas antes de confirmar a importação.",**summary},status=400)
+                created=apply_content_import(rows,request.user)
+                return Response({"kind":"contents","format":"xlsx","fileName":upload.name,"dryRun":False,"createdIds":created,**summary},status=201)
+            if upload.name.lower().endswith(".pdf"):
+                data=pdf_to_content(upload,request.data)
+                preview={"row":1,"status":"skip" if data["duplicate"] else "valid","label":data["title"],"errors":[],"warnings":["conteúdo com este título já existe e será ignorado"] if data["duplicate"] else []}
+                summary={"validRows":0 if data["duplicate"] else 1,"skippedRows":1 if data["duplicate"] else 0,"invalidRows":0,"preview":[preview],"pdf":{"pages":data["pages"],"characters":data["characters"],"textPreview":data["body"][:1200]}}
+                if dry_run:return Response({"kind":"contents","format":"pdf","fileName":upload.name,"dryRun":True,**summary})
+                created_id=apply_pdf_content(data,request.user)
+                return Response({"kind":"contents","format":"pdf","fileName":upload.name,"dryRun":False,"createdIds":[created_id] if created_id else [],**summary},status=201)
+            return Response({"detail":"Formato inválido. Use XLSX ou PDF."},status=400)
+        except ValueError as exc:return Response({"detail":str(exc)},status=400)
 
 class AdminQuestionsView(APIView):
     permission_classes=[permissions.IsAdminUser]

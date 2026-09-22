@@ -1,4 +1,4 @@
-export const tutorialRestrictedViews = ["Competição", "Revisar", "Simulados"] as const;
+export const tutorialRestrictedViews = ["Competição", "Revisar", "Simulados", "Inteligência"] as const;
 
 export function isTutorialCourseExperience(role: string | undefined, courseType: "concurso" | "tutorial" | null | undefined) {
   return role !== "admin" && courseType === "tutorial";

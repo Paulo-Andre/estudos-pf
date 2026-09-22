@@ -25,6 +25,7 @@ import { CourseMarketplace } from "@/components/CourseMarketplace";
 import { RootManagementPanel, RootManagementSection } from "@/components/RootManagementPanel";
 import { GlobalContactLinks } from "@/components/GlobalContactLinks";
 import { CourseAccessRequired } from "@/components/CourseAccessRequired";
+import { IntelligenceArea, type IntelligenceTopic, type LearningFeatures, type LearningIntelligence } from "@/components/IntelligenceArea";
 import { StudentAlerts } from "@/components/StudentAlerts";
 import { RichContentBody } from "@/components/RichContentBody";
 import { Textarea } from "@/components/ui/textarea";
@@ -36,7 +37,7 @@ import { isStorefrontPreviewMode } from "@/lib/storefrontPreview";
 import { resolveVisibleStudyCourseId, visibleStudyCourses } from "@/lib/studyCourseAccess";
 import { resolveStudyWorkspaceAccessState } from "@/lib/studyWorkspaceAccess";
 
-type View = "Painel" | "Conteúdo" | "Roteiro" | "Simulados" | "Competição" | "Revisar" | "Histórico" | "Cursos" | "Acessos";
+type View = "Painel" | "Inteligência" | "Conteúdo" | "Roteiro" | "Simulados" | "Competição" | "Revisar" | "Histórico" | "Cursos" | "Acessos";
 type StudyModule = DetailedStudyModule & { chapter?: ApostilaChapter };
 type RestQuestion = {
   id: number;
@@ -53,7 +54,9 @@ type RestQuestion = {
   source?: string | null;
 };
 type SimulationQuestion = StudyQuestion & { persistentQuestionId?: number };
-type ActiveSimulation = { questions: SimulationQuestion[]; index: number; answers: Record<string, boolean>; confidences: Record<string, number>; startedAt: number } | null;
+type SimulationMode = "practice" | "domain" | "real_exam";
+type SimulationTelemetryItem = { questionId: string; elapsedMs: number; changes: number; confidence: number | null; correct: boolean; discipline: string; subject: string };
+type ActiveSimulation = { questions: SimulationQuestion[]; index: number; answers: Record<string, boolean>; confidences: Record<string, number>; startedAt: number; questionStartedAt: number; mode: SimulationMode; telemetryEnabled: boolean; telemetry: Record<string, SimulationTelemetryItem> } | null;
 type PersonalReviewItem = { id: number; questionKey: string; snapshot: { statement: string; answer: boolean; explanation: string; discipline: string; subject: string; source?: string }; status: "pending" | "mastered"; createdAt: string; reviewedAt: string | null; source?: string; dueAt?: string | null; intervalDays?: number; repetitions?: number; lapseCount?: number; lastRating?: "again" | "hard" | "good" | "easy" | "" };
 type LearningPlan = {
   method: { name: string; steps: { id: "learn" | "practice" | "review" | "simulate"; label: string; principle: string; status: string }[] };
@@ -71,7 +74,7 @@ type RoadmapItem = { id: number; contentId: number; disciplineId: number; discip
 type StudyCourseOption = { id: string; title: string; track: string; courseType: "concurso" | "tutorial"; description: string | null; coverImageUrl: string | null; panelLabel: string | null; panelBadge: string | null; panelTitle: string | null; panelDescription: string | null; panelCtaText: string | null; isActive: boolean };
 
 const navigation: { label: View; icon: typeof LayoutDashboard }[] = [
-  { label: "Painel", icon: LayoutDashboard }, { label: "Conteúdo", icon: BookOpen }, { label: "Roteiro", icon: CalendarClock }, { label: "Simulados", icon: Play }, { label: "Competição", icon: Trophy }, { label: "Revisar", icon: RotateCcw }, { label: "Histórico", icon: History },
+  { label: "Painel", icon: LayoutDashboard }, { label: "Inteligência", icon: BarChart3 }, { label: "Conteúdo", icon: BookOpen }, { label: "Roteiro", icon: CalendarClock }, { label: "Simulados", icon: Play }, { label: "Competição", icon: Trophy }, { label: "Revisar", icon: RotateCcw }, { label: "Histórico", icon: History },
 ];
 
 function formatTime(seconds: number) {
@@ -181,7 +184,7 @@ function StudyWorkspace({ user, logout, initialView, initialCommercePlanId, onCo
   const activeCourseTitle = activeCourse?.title ?? activeContest?.name ?? "Curso de estudo";
   const activeCourseRole = activeContest?.role ?? (activeCourse?.courseType === "tutorial" ? "Tutorial" : activeCourse?.track ?? "Trilha de estudo");
   const tutorialCourse = isTutorialCourseExperience(user.role, activeCourse?.courseType);
-  const visibleNavigation = navigation.filter(item => canOpenTutorialView(item.label, tutorialCourse));
+  const tutorialNavigation = navigation.filter(item => canOpenTutorialView(item.label, tutorialCourse));
   const canUseActiveCourse = hasConfirmedCourseAccess && (user.role === "admin" || permittedContestIds.includes(effectiveContestId));
   const studyBundleQuery = (trpc.study as any).bundle.useQuery({ courseId: effectiveContestId }, { enabled: canUseActiveCourse, refetchOnWindowFocus: false });
   const availableModules = useMemo<StudyModule[]>(() => {
@@ -227,6 +230,10 @@ function StudyWorkspace({ user, logout, initialView, initialCommercePlanId, onCo
   const personalReviewsQuery = (trpc.study.review.list as any).useQuery({ dueOnly: true }, { enabled: hasConfirmedCourseAccess && !tutorialCourse, refetchOnWindowFocus: false });
   const contentProgressQuery = trpc.study.contentProgress.get.useQuery({ courseId: effectiveContestId }, { enabled: canUseActiveCourse, refetchOnWindowFocus: false });
   const learningPlanQuery = trpc.study.learningPlan.useQuery({ courseId: effectiveContestId }, { enabled: canUseActiveCourse, refetchOnWindowFocus: false });
+  const learningFeaturesQuery = (trpc.study as any).learningFeatures.useQuery({ courseId: effectiveContestId }, { enabled: canUseActiveCourse && !tutorialCourse, refetchOnWindowFocus: false });
+  const learningFeatures = (learningFeaturesQuery.data ?? null) as LearningFeatures | null;
+  const visibleNavigation = tutorialNavigation.filter(item => item.label !== "Inteligência" || learningFeatures?.enabled === true);
+  const learningIntelligenceQuery = (trpc.study as any).learningIntelligence.useQuery({ courseId: effectiveContestId }, { enabled: canUseActiveCourse && !tutorialCourse && learningFeatures?.enabled === true, refetchOnWindowFocus: false });
   const roadmapQuery = trpc.study.roadmap.list.useQuery({ courseId: effectiveContestId }, { enabled: canUseActiveCourse, refetchOnWindowFocus: false });
   const personalCompetitionScoreQuery = trpc.competition.myScore.useQuery({}, { enabled: canUseActiveCourse && !tutorialCourse, refetchOnWindowFocus: false });
   const answerMutation = trpc.study.answer.useMutation();
@@ -247,6 +254,11 @@ function StudyWorkspace({ user, logout, initialView, initialCommercePlanId, onCo
   useEffect(() => {
     if (privateState.data) setState(privateState.data as StudyState);
   }, [privateState.data]);
+
+  useEffect(() => {
+    if (view === "Inteligência" && learningFeaturesQuery.data && learningFeaturesQuery.data.enabled !== true) setView("Painel");
+  }, [view, learningFeaturesQuery.data]);
+
 
   useEffect(() => {
     const prefs=uiPreferencesQuery.data;
@@ -316,11 +328,11 @@ function StudyWorkspace({ user, logout, initialView, initialCommercePlanId, onCo
     updateState((current) => ({
       ...current,
       xp: current.xp + (correct ? 8 : 2),
-      answers: [...current.answers, { questionId: question.id, correct, answeredAt: new Date().toISOString() }],
+      answers: [...current.answers, { questionId: question.id, courseId: effectiveContestId, correct, confidence, answeredAt: new Date().toISOString() }],
       studyDates: current.studyDates.includes(today) ? current.studyDates : [...current.studyDates, today],
       lastStudyDate: today,
     }));
-    answerMutation.mutate({ questionId: question.id, correct, confidence } as any, { onSuccess: serverState => { setState(serverState as StudyState); void personalReviewsQuery.refetch(); void learningPlanQuery.refetch(); } });
+    answerMutation.mutate({ courseId: effectiveContestId, questionId: question.id, correct, confidence } as any, { onSuccess: serverState => { setState(serverState as StudyState); void personalReviewsQuery.refetch(); void learningPlanQuery.refetch(); if (learningFeatures?.enabled) void learningIntelligenceQuery.refetch(); } });
   }
 
   function addToPersonalReview(question: StudyQuestion) {
@@ -361,33 +373,69 @@ function StudyWorkspace({ user, logout, initialView, initialCommercePlanId, onCo
     else setView("Conteúdo");
   }
 
-  function startSimulation(total: number, focusDiscipline?: string) {
+  function startSimulation(total: number, focusDiscipline?: string, focusSubject?: string, mode: SimulationMode = "practice") {
     setSimulationResult(null);
     setSimulationNotice(null);
-    const strictReviewMode = centralQuestionsQuery.data?.requiresReviewMode === true;
-    const bank = focusDiscipline ? persistentSimulationQuestions.filter(item => item.discipline === focusDiscipline) : persistentSimulationQuestions;
-    const questions = selectBalancedBooleanQuestions(bank, total, state.usedQuestionIds);
-    if (questions.length < total) {
-      setSimulationNotice(focusDiscipline ? `Há somente ${questions.length} questão(ões) disponíveis em ${focusDiscipline}. Reduza o treino focal ou publique mais questões dessa disciplina.` : strictReviewMode ? `Há somente ${questions.length} questão(ões) central(is) aprovada(s)/publicada(s) para revisão obrigatória. Publique ao menos ${total} para iniciar este simulado.` : `Há somente ${questions.length} questões disponíveis para este simulado.`);
+    if (total < 1) {
+      setSimulationNotice("Não há questões suficientes para iniciar este modo.");
       return;
     }
-    setSimulation({ questions, index: 0, answers: {}, confidences: {}, startedAt: Date.now() });
+    if (mode === "domain" && (!learningFeatures?.enabled || !learningFeatures.domainProofEnabled)) {
+      setSimulationNotice("A Prova de Domínio está desativada para este curso.");
+      return;
+    }
+    if (mode === "real_exam" && (!learningFeatures?.enabled || !learningFeatures.realExamEnabled)) {
+      setSimulationNotice("O Modo Prova Real está desativado para este curso.");
+      return;
+    }
+    if (mode === "domain" && learningFeatures && total > learningFeatures.domainProofQuestionCount) total = learningFeatures.domainProofQuestionCount;
+    if (mode === "real_exam" && learningFeatures) {
+      if (total < learningFeatures.realExamMinQuestions) {
+        setSimulationNotice(`O Modo Prova Real exige pelo menos ${learningFeatures.realExamMinQuestions} questões neste curso.`);
+        return;
+      }
+      total = Math.min(total, learningFeatures.realExamQuestionCount);
+    }
+    const strictReviewMode = centralQuestionsQuery.data?.requiresReviewMode === true;
+    const bank = persistentSimulationQuestions.filter(item => (!focusDiscipline || item.discipline === focusDiscipline) && (!focusSubject || item.subject.includes(focusSubject)));
+    const questions = selectBalancedBooleanQuestions(bank, total, state.usedQuestionIds);
+    if (questions.length < total) {
+      const focusLabel = focusSubject ? (focusDiscipline || "Tópico") + " · " + focusSubject : focusDiscipline;
+      setSimulationNotice(focusLabel ? "Há somente " + questions.length + " questão(ões) disponíveis em " + focusLabel + ". Reduza o bloco ou publique mais questões desse tópico." : strictReviewMode ? "Há somente " + questions.length + " questão(ões) central(is) aprovada(s)/publicada(s) para revisão obrigatória. Publique ao menos " + total + " para iniciar este simulado." : "Há somente " + questions.length + " questões disponíveis para este simulado.");
+      return;
+    }
+    const now = Date.now();
+    setSimulation({ questions, index: 0, answers: {}, confidences: {}, startedAt: now, questionStartedAt: now, mode, telemetryEnabled: mode !== "real_exam" || learningFeatures?.telemetryEnabled !== false, telemetry: {} });
   }
 
-  function submitSimulationAnswer(answer: boolean, confidence: number) {
+  function submitSimulationAnswer(answer: boolean, confidence: number, itemTelemetry?: { elapsedMs: number; changes: number }) {
     if (!simulation) return;
     const question = simulation.questions[simulation.index];
     const hasSelectedAnswer = Object.prototype.hasOwnProperty.call(simulation.answers, question.id);
-    const nextAnswers = hasSelectedAnswer ? simulation.answers : { ...simulation.answers, [question.id]: answer };
-    const nextConfidences = hasSelectedAnswer ? simulation.confidences : { ...simulation.confidences, [question.id]: confidence };
-    if (!hasSelectedAnswer) {
-      setSimulation({ ...simulation, answers: nextAnswers, confidences: nextConfidences });
+    const isRealExam = simulation.mode === "real_exam";
+    const nextAnswers = (!hasSelectedAnswer || isRealExam) ? { ...simulation.answers, [question.id]: answer } : simulation.answers;
+    const nextConfidences = (!hasSelectedAnswer || isRealExam) ? { ...simulation.confidences, [question.id]: confidence } : simulation.confidences;
+    const shouldTrackTelemetry = !isRealExam || simulation.telemetryEnabled;
+    const telemetryItem: SimulationTelemetryItem = simulation.telemetry[question.id] ?? {
+      questionId: question.id,
+      elapsedMs: Math.max(0, itemTelemetry?.elapsedMs ?? (Date.now() - simulation.questionStartedAt)),
+      changes: Math.max(0, itemTelemetry?.changes ?? 0),
+      confidence,
+      correct: answer === question.answer,
+      discipline: question.discipline,
+      subject: question.subject,
+    };
+    const nextTelemetry = shouldTrackTelemetry ? { ...simulation.telemetry, [question.id]: telemetryItem } : simulation.telemetry;
+
+    if (!isRealExam && !hasSelectedAnswer) {
+      setSimulation({ ...simulation, answers: nextAnswers, confidences: nextConfidences, telemetry: nextTelemetry });
       return;
     }
     if (simulation.index < simulation.questions.length - 1) {
-      setSimulation({ ...simulation, index: simulation.index + 1, answers: nextAnswers, confidences: nextConfidences });
+      setSimulation({ ...simulation, index: simulation.index + 1, answers: nextAnswers, confidences: nextConfidences, telemetry: nextTelemetry, questionStartedAt: Date.now() });
       return;
     }
+
     const byDiscipline: SimulationRecord["byDiscipline"] = {};
     const byBlock: SimulationRecord["byBlock"] = { I: { correct: 0, total: 0 }, II: { correct: 0, total: 0 }, III: { correct: 0, total: 0 } };
     const answerRecords: AnswerRecord[] = [];
@@ -400,12 +448,42 @@ function StudyWorkspace({ user, logout, initialView, initialCommercePlanId, onCo
       if (isCorrect) byDiscipline[item.discipline].correct += 1;
       byBlock[item.block].total += 1;
       if (isCorrect) byBlock[item.block].correct += 1;
-      answerRecords.push({ questionId: item.id, correct: isCorrect, answeredAt: new Date().toISOString() });
+      answerRecords.push({ questionId: item.id, courseId: effectiveContestId, correct: isCorrect, confidence: nextConfidences[item.id] ?? null, answeredAt: new Date().toISOString() });
     });
-    const result: SimulationRecord = { id: `sim-${Date.now()}`, date: new Date().toISOString(), total: simulation.questions.length, correct, errors: simulation.questions.length - correct, elapsedSeconds: Math.round((Date.now() - simulation.startedAt) / 1000), byDiscipline, byBlock };
+
+    const telemetryQuestions = shouldTrackTelemetry ? simulation.questions.map(item => nextTelemetry[item.id]).filter(Boolean) as SimulationTelemetryItem[] : [];
+    const half = Math.max(1, Math.floor(telemetryQuestions.length / 2));
+    const firstHalf = telemetryQuestions.slice(0, half);
+    const secondHalf = telemetryQuestions.slice(half).length ? telemetryQuestions.slice(half) : firstHalf;
+    const firstHalfAccuracy = percentage(firstHalf.filter(item => item.correct).length, firstHalf.length);
+    const secondHalfAccuracy = percentage(secondHalf.filter(item => item.correct).length, secondHalf.length);
+    const slowest = telemetryQuestions.reduce<SimulationTelemetryItem | null>((current, item) => !current || item.elapsedMs > current.elapsedMs ? item : current, null);
+    const telemetrySummary = telemetryQuestions.length ? {
+      averageSeconds: Math.round((telemetryQuestions.reduce((sum, item) => sum + item.elapsedMs, 0) / telemetryQuestions.length / 1000) * 10) / 10,
+      answerChanges: telemetryQuestions.reduce((sum, item) => sum + item.changes, 0),
+      highConfidenceErrors: telemetryQuestions.filter(item => item.confidence === 3 && !item.correct).length,
+      firstHalfAccuracy,
+      secondHalfAccuracy,
+      performanceDrop: firstHalfAccuracy - secondHalfAccuracy,
+      slowestQuestion: slowest ? { questionId: slowest.questionId, seconds: Math.round((slowest.elapsedMs / 1000) * 10) / 10, subject: slowest.subject } : undefined,
+    } : {};
+
+    const result: SimulationRecord = {
+      id: "sim-" + Date.now(), date: new Date().toISOString(), courseId: effectiveContestId, mode: simulation.mode,
+      total: simulation.questions.length, correct, errors: simulation.questions.length - correct,
+      elapsedSeconds: Math.round((Date.now() - simulation.startedAt) / 1000), byDiscipline, byBlock,
+      telemetry: { questions: telemetryQuestions, summary: telemetrySummary },
+    };
     const today = new Date().toISOString().slice(0, 10);
     updateState((current) => ({ ...current, xp: current.xp + correct * 8 + 15, simulations: [...current.simulations, result], answers: [...current.answers, ...answerRecords], usedQuestionIds: Array.from(new Set([...current.usedQuestionIds, ...simulation.questions.map((item) => item.id)])), studyDates: current.studyDates.includes(today) ? current.studyDates : [...current.studyDates, today], lastStudyDate: today, weeklySimulationCorrect: current.weeklySimulationCorrect + correct }));
-    simulationMutation.mutate({ id: result.id, total: result.total, correct: result.correct, errors: result.errors, elapsedSeconds: result.elapsedSeconds, byDiscipline: result.byDiscipline, byBlock: result.byBlock, answers: answerRecords.map(answer => ({ questionId: answer.questionId, correct: answer.correct, confidence: nextConfidences[answer.questionId] ?? null })), questionIds: simulation.questions.map(item => item.id), persistentAnswers: simulation.questions.filter((item): item is SimulationQuestion & { persistentQuestionId: number } => typeof item.persistentQuestionId === "number").map(item => ({ questionId: item.persistentQuestionId, correct: nextAnswers[item.id] === item.answer, snapshot: { statement: item.statement, type: "certo_errado", answer: item.answer, explanation: item.explanation, discipline: item.discipline, subject: item.subject, difficulty: item.difficulty, source: item.source, confidence: nextConfidences[item.id] ?? null } })) } as any, { onSuccess: serverState => setState(serverState as StudyState) });
+    simulationMutation.mutate({
+      id: result.id, courseId: effectiveContestId, mode: simulation.mode, total: result.total, correct: result.correct, errors: result.errors,
+      elapsedSeconds: result.elapsedSeconds, byDiscipline: result.byDiscipline, byBlock: result.byBlock,
+      telemetry: { questions: telemetryQuestions },
+      answers: answerRecords.map(item => ({ questionId: item.questionId, correct: item.correct, confidence: item.confidence ?? null })),
+      questionIds: simulation.questions.map(item => item.id),
+      persistentAnswers: simulation.questions.filter((item): item is SimulationQuestion & { persistentQuestionId: number } => typeof item.persistentQuestionId === "number").map(item => ({ questionId: item.persistentQuestionId, correct: nextAnswers[item.id] === item.answer, snapshot: { statement: item.statement, type: "certo_errado", answer: item.answer, explanation: item.explanation, discipline: item.discipline, subject: item.subject, difficulty: item.difficulty, source: item.source, confidence: nextConfidences[item.id] ?? null } })),
+    } as any, { onSuccess: serverState => { setState(serverState as StudyState); void learningIntelligenceQuery.refetch(); void learningPlanQuery.refetch(); } });
     setSimulation(null);
     setSimulationResult(result);
   }
@@ -441,11 +519,12 @@ function StudyWorkspace({ user, logout, initialView, initialCommercePlanId, onCo
           <div className="flex min-w-0 items-center gap-2 sm:gap-3"><button style={{ borderColor: brand.borderColor, color: brand.textColor }} aria-label="Abrir navegação" aria-controls="study-navigation" aria-expanded={menuOpen} className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border bg-white shadow-sm lg:hidden" onClick={() => setMenuOpen(true)}><Menu className="h-5 w-5" /></button><div className="min-w-0"><p style={{ color: brand.mutedTextColor }} className="truncate text-[9px] font-bold uppercase tracking-[.15em]">{activeCourse?.courseType === "tutorial" ? "Tutorial" : "Concurso"} · {activeCourseTitle}</p><h1 style={{ color: brand.textColor }} className="font-display truncate text-lg font-extrabold">{view}</h1></div></div>
           <div className="flex shrink-0 items-center gap-2"><div className="hidden items-center gap-2 rounded-xl border border-[#dce6e1] bg-white px-3 py-2 sm:flex"><Flame className="h-4 w-4 text-[#d2823b]" /><span className="text-xs font-bold">{streak} dia{streak === 1 ? "" : "s"}</span></div><PersonalSimulationSeal identity={personalSimulationSeal} loading={privateState.isLoading} /><button onClick={() => setAccountOpen(true)} aria-label="Abrir conta" className="grid h-10 w-10 place-items-center rounded-xl border border-[#dce6e1] bg-white text-[#0e5a70] shadow-sm"><UserRound className="h-5 w-5" /></button></div>
         </header>
-        <div className="workspace-content mx-auto max-w-[1480px] p-3 sm:p-6 lg:p-8"><ContestSelector contestId={effectiveContestId} courses={permittedCourses} onChange={setContestId} />{view === "Painel" && user.role !== "admin" && <StudentAlerts />}{simulation ? <SimulationScreen simulation={simulation} onAnswer={submitSimulationAnswer} onExit={() => setSimulation(null)} /> : simulationResult ? <SimulationResult result={simulationResult} onReflectionSaved={(reflection) => { const simulationId=simulationResult.id; setSimulationResult(current=>current?{...current,reflection}:current); setState(current=>({...current,simulations:current.simulations.map(item=>item.id===simulationId?{...item,reflection}:item)})); }} onFollowReflectionAction={(action) => { setSimulationResult(null); if(action==="review"||action==="practice") setView("Revisar"); else if(action==="content") setView("Conteúdo"); else setView("Simulados"); }} onAgain={() => startSimulation(simulationResult.total)} onClose={() => { setSimulationResult(null); setView("Histórico"); }} /> : <>
+        <div className="workspace-content mx-auto max-w-[1480px] p-3 sm:p-6 lg:p-8"><ContestSelector contestId={effectiveContestId} courses={permittedCourses} onChange={setContestId} />{view === "Painel" && user.role !== "admin" && <StudentAlerts />}{simulation ? (simulation.mode === "real_exam" ? <RealExamScreen simulation={simulation} onConfirm={submitSimulationAnswer} onExit={() => setSimulation(null)} /> : <SimulationScreen simulation={simulation} onAnswer={submitSimulationAnswer} onExit={() => setSimulation(null)} />) : simulationResult ? <SimulationResult result={simulationResult} onReflectionSaved={(reflection) => { const simulationId=simulationResult.id; setSimulationResult(current=>current?{...current,reflection}:current); setState(current=>({...current,simulations:current.simulations.map(item=>item.id===simulationId?{...item,reflection}:item)})); }} onFollowReflectionAction={(action) => { setSimulationResult(null); if(action==="review"||action==="practice") setView("Revisar"); else if(action==="content") setView("Conteúdo"); else setView("Simulados"); }} onAgain={() => { const first = simulationResult.telemetry?.questions?.[0]; startSimulation(simulationResult.total, simulationResult.mode === "domain" ? first?.discipline : undefined, simulationResult.mode === "domain" ? first?.subject : undefined, simulationResult.mode ?? "practice"); }} onClose={() => { setSimulationResult(null); setView("Histórico"); }} /> : <>
           {view === "Painel" && <Dashboard state={state} modules={availableModules} contestName={activeCourseTitle} coverImageUrl={activeCourse?.coverImageUrl} panelLabel={activeCourse?.panelLabel} panelBadge={activeCourse?.panelBadge} panelTitle={activeCourse?.panelTitle} panelDescription={activeCourse?.panelDescription} panelCtaText={activeCourse?.panelCtaText} level={level} totalAnswers={totalAnswers} overallScore={overallScore} streak={streak} studiedPercent={studiedPercent} focus={focus} historyChart={historyChart} learningPlan={(learningPlanQuery.data ?? null) as LearningPlan | null} onLearningAction={(action) => { if(action.type==="review"||action.type==="practice") setView("Revisar"); else if(action.type==="simulate") setView("Simulados"); else if(action.type==="plan") setView("Roteiro"); else if(action.type==="learn"&&action.contentId) openScheduledContent(action.contentId); else setView("Conteúdo"); }} onStudy={() => setView("Conteúdo")} onSimulate={tutorialCourse ? undefined : () => setView("Simulados")} continueItem={(contentProgressQuery.data?.continueItem ?? null) as StudyProgressItem | null} onOpenScheduledContent={openScheduledContent} onOpenPlanner={() => setView("Roteiro")} />}
           {view === "Roteiro" && <WeeklyStudyPlanner progressItems={(contentProgressQuery.data?.contents ?? []) as StudyProgressItem[]} roadmapItems={(roadmapQuery.data ?? []) as RoadmapItem[]} learningPlan={(learningPlanQuery.data ?? null) as LearningPlan | null} onOpenScheduledContent={openScheduledContent} onSaveRoadmap={(input) => saveRoadmapMutation.mutate({ courseId: effectiveContestId, ...input })} onRemoveRoadmap={(id) => removeRoadmapMutation.mutate({ id })} saving={saveRoadmapMutation.isPending || removeRoadmapMutation.isPending} />}
           {view === "Conteúdo" && <StudyArea state={state} modules={availableModules} contestName={activeCourseTitle} contentByModuleId={contentByModuleId} learningPlan={(learningPlanQuery.data ?? null) as LearningPlan | null} onOpen={openModuleWithProgress} />}
-          {!tutorialCourse && view === "Simulados" && <Simulations onStart={startSimulation} state={state} learningPlan={(learningPlanQuery.data ?? null) as LearningPlan | null} notice={simulationNotice} strictReviewMode={centralQuestionsQuery.data?.requiresReviewMode === true} centralCount={persistentSimulationQuestions.length} />}
+          {!tutorialCourse && learningFeatures?.enabled && view === "Inteligência" && <IntelligenceArea data={(learningIntelligenceQuery.data ?? null) as LearningIntelligence | null} loading={learningIntelligenceQuery.isLoading} onRefresh={() => void learningIntelligenceQuery.refetch()} onStartDomainProof={(topic: IntelligenceTopic) => startSimulation(topic.proofQuestionCount, topic.discipline, topic.subject, "domain")} onStartRealExam={() => { const minimum=learningFeatures.realExamMinQuestions; if (persistentSimulationQuestions.length < minimum) { setSimulationNotice(`Há somente ${persistentSimulationQuestions.length} questões disponíveis. O Modo Prova Real exige ao menos ${minimum} neste curso.`); setView("Simulados"); return; } startSimulation(Math.min(learningFeatures.realExamQuestionCount, persistentSimulationQuestions.length), undefined, undefined, "real_exam"); }} />}
+          {!tutorialCourse && view === "Simulados" && <Simulations onStart={startSimulation} state={state} learningPlan={(learningPlanQuery.data ?? null) as LearningPlan | null} notice={simulationNotice} strictReviewMode={centralQuestionsQuery.data?.requiresReviewMode === true} centralCount={persistentSimulationQuestions.length} learningFeatures={learningFeatures} />}
           {!tutorialCourse && view === "Competição" && <><CompetitionMedal identity={personalCompetitionIdentity} totalPoints={personalCompetitionScoreQuery.data?.totalPoints ?? 0} position={personalCompetitionScoreQuery.data?.position ?? null} loading={personalCompetitionScoreQuery.isLoading} /><CompetitionArea defaultCourseId={effectiveContestId} /><CompetitionProgressPanel defaultCourseId={effectiveContestId} /></>}
           {!tutorialCourse && view === "Revisar" && <ReviewArea state={state} modules={availableModules} questions={persistentSimulationQuestions} personalReviews={(personalReviewsQuery.data ?? []) as PersonalReviewItem[]} personalReviewsLoading={personalReviewsQuery.isLoading} onStartQuestion={(question) => { setManualQuickQuestion(question); setQuickAnswer(null); setView("Painel"); }} onRatePersonalReview={ratePersonalReview} onCompletePersonalReview={completePersonalReview} onRemovePersonalReview={removePersonalReview} reviewPending={completePersonalReviewMutation.isPending || ratePersonalReviewMutation.isPending || removePersonalReviewMutation.isPending} />}
           {view === "Histórico" && <HistoryArea state={state} learningPlan={(learningPlanQuery.data ?? null) as LearningPlan | null} onReview={() => setView("Revisar")} onSimulate={() => setView("Simulados")} />}
@@ -706,7 +785,7 @@ function QuickCheck({ question, answer, correct, reviewSaved, reviewPending, onA
   </div>;
 }
 
-function Simulations({ onStart, state, learningPlan, notice, strictReviewMode, centralCount }: { onStart: (size: number, focusDiscipline?: string) => void; state: StudyState; learningPlan: LearningPlan | null; notice: string | null; strictReviewMode: boolean; centralCount: number }) {
+function Simulations({ onStart, state, learningPlan, notice, strictReviewMode, centralCount, learningFeatures }: { onStart: (size: number, focusDiscipline?: string, focusSubject?: string, mode?: SimulationMode) => void; state: StudyState; learningPlan: LearningPlan | null; notice: string | null; strictReviewMode: boolean; centralCount: number; learningFeatures: LearningFeatures | null }) {
   const last=state.simulations.at(-1); const best=state.simulations.length?Math.max(...state.simulations.map(sim=>percentage(sim.correct,sim.total))):0;
   const recommendedSize=learningPlan?.dueReviews.length?10:(learningPlan?.metrics.readiness??0)>=80?60:(learningPlan?.metrics.readiness??0)>=55?20:10;
   const modes=[{size:10,label:"Diagnóstico",detail:"Rápido · identifica lacunas"},{size:20,label:"Treino de domínio",detail:"Consolida conteúdo e ritmo"},{size:60,label:"Prova completa",detail:"Resistência e estratégia"}];
@@ -721,13 +800,43 @@ function Simulations({ onStart, state, learningPlan, notice, strictReviewMode, c
       </div>
     </section>}
     {learningPlan?.weaknesses?.[0]&&<section className="rounded-2xl border border-[#c9dfd8] bg-[#f4faf8] p-4 sm:p-5"><div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><p className="eyebrow">TREINO FOCAL</p><h3 className="font-display mt-1 text-lg font-extrabold text-[#24434d]">{learningPlan.weaknesses[0].discipline} · {learningPlan.weaknesses[0].accuracy}%</h3><p className="mt-1 text-xs leading-5 text-[#64777a]">Faça um bloco curto só nessa matéria e depois volte ao simulado misto. Corrija a fraqueza sem perder a capacidade de alternar contextos.</p></div><button onClick={()=>onStart(10,learningPlan.weaknesses[0].discipline)} className="action-button shrink-0">Treinar 10 questões</button></div></section>}
+{learningFeatures?.enabled&&learningFeatures.realExamEnabled&&<section className="rounded-2xl border border-[#b8d6ce] bg-[#edf7f4] p-4 sm:p-5"><div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="eyebrow">MODO PROVA REAL{learningFeatures.telemetryEnabled?" · TELEMETRIA":""}</p><h3 className="font-display mt-1 text-lg font-extrabold text-[#24434d]">Sem feedback até o fim.</h3><p className="mt-1 max-w-2xl text-xs leading-5 text-[#64777a]">{learningFeatures.telemetryEnabled?"Registra tempo por item, trocas antes da confirmação, confiança e estabilidade entre as metades da prova.":"Executa em condições de prova, mas sem telemetria detalhada por decisão do administrador."}</p></div><button disabled={centralCount<learningFeatures.realExamMinQuestions} onClick={()=>onStart(Math.min(learningFeatures.realExamQuestionCount,centralCount),undefined,undefined,"real_exam")} className="action-button shrink-0 disabled:cursor-not-allowed disabled:opacity-45">Iniciar Prova Real</button></div>{centralCount<learningFeatures.realExamMinQuestions&&<p className="mt-3 text-[10px] font-semibold text-[#8a6630]">São necessárias ao menos {learningFeatures.realExamMinQuestions} questões para liberar este modo.</p>}</section>}
     <section className="grid grid-cols-2 gap-3 lg:grid-cols-4"><Metric icon={History} label="Simulados" value={state.simulations.length.toString()} detail="concluídos" tone="teal"/><Metric icon={Gauge} label="Melhor nota" value={`${best}%`} detail="seu recorde" tone="blue"/><Metric icon={Target} label="Último resultado" value={last?`${percentage(last.correct,last.total)}%`:"—"} detail={last?`${last.correct}/${last.total} acertos`:"faça o primeiro"} tone="amber"/><Metric icon={Clock3} label="Último tempo" value={last?formatTime(last.elapsedSeconds):"—"} detail="tempo total" tone="orange"/></section>
     <section className="grid gap-3 md:grid-cols-3">{blocks.map(block=><article key={block.id} className="shell-card p-5"><div className="flex items-center justify-between"><span className="eyebrow">{block.label}</span><span className="font-display text-2xl font-extrabold text-[#0e5a70]">{Math.round(block.ratio*100)}%</span></div><p className="mt-3 text-sm font-bold text-[#2d4b53]">{block.description}</p><p className="mt-1 text-xs text-[#738286]">{block.items} itens na prova completa</p><div className="mt-4 h-2 overflow-hidden rounded-full bg-[#e7efec]"><div className="h-full rounded-full bg-[#0e5a70]" style={{width:`${block.ratio*100}%`}}/></div></article>)}</section>
     <section className="soft-panel p-5"><div className="flex items-start gap-3"><ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-[#0e5a70]"/><div><h3 className="font-display font-extrabold text-[#24434d]">Como aproveitar melhor</h3><p className="mt-1 text-sm leading-6 text-[#64777a]">Faça simulados menores durante a semana e use os maiores para medir resistência, tempo e estabilidade do desempenho. Seus erros alimentam a área de revisão.</p></div></div></section>
   </div>;
 }
 
-function SimulationScreen({ simulation, onAnswer, onExit }: { simulation: NonNullable<ActiveSimulation>; onAnswer: (answer: boolean, confidence: number) => void; onExit: () => void }) {
+function RealExamScreen({ simulation, onConfirm, onExit }: { simulation: NonNullable<ActiveSimulation>; onConfirm: (answer: boolean, confidence: number, telemetry: { elapsedMs: number; changes: number }) => void; onExit: () => void }) {
+  const question=simulation.questions[simulation.index];
+  const progress=((simulation.index+1)/simulation.questions.length)*100;
+  const [draftAnswer,setDraftAnswer]=useState<boolean|null>(null);
+  const [confidence,setConfidence]=useState<number|null>(null);
+  const [changes,setChanges]=useState(0);
+  const [elapsedSeconds,setElapsedSeconds]=useState(0);
+  useEffect(()=>{
+    setDraftAnswer(null);
+    setConfidence(null);
+    setChanges(0);
+    setElapsedSeconds(Math.max(0,Math.floor((Date.now()-simulation.questionStartedAt)/1000)));
+    const timer=window.setInterval(()=>setElapsedSeconds(Math.max(0,Math.floor((Date.now()-simulation.questionStartedAt)/1000))),1000);
+    return ()=>window.clearInterval(timer);
+  },[question.id,simulation.questionStartedAt]);
+  const choose=(value:boolean)=>{setDraftAnswer(current=>{if(current!==null&&current!==value)setChanges(total=>total+1);return value;});};
+  return <div className="mx-auto max-w-4xl">
+    <div className="mb-7 flex items-center justify-between gap-3"><div><p className="eyebrow">MODO PROVA REAL · SEM FEEDBACK</p><p className="font-display mt-1 text-lg font-bold">Item {simulation.index+1} de {simulation.questions.length}</p></div><div className="flex items-center gap-2"><span className="rounded-lg border border-[#d8e2de] bg-white px-3 py-2 text-xs font-bold text-[#526d73]"><Clock3 className="mr-1 inline h-3.5 w-3.5"/>{formatTime(elapsedSeconds)}</span><button className="ghost-button" onClick={onExit}><X className="h-4 w-4"/>Abandonar</button></div></div>
+    <div className="mb-8 h-2 overflow-hidden rounded-full bg-[#ddd5c7]"><div className="h-full bg-[#0e5a70] transition-all duration-300" style={{width:progress+"%"}}/></div>
+    <article className="shell-card p-6 sm:p-10">
+      <div className="mb-7 flex flex-wrap gap-2"><span className="rounded-lg bg-[#e4efed] px-2 py-1 text-[10px] font-bold tracking-wider text-[#0e5a70]">{question.discipline}</span><span className="rounded-lg border border-[#e4ddd0] px-2 py-1 text-[10px] font-bold tracking-wider text-[#718087]">{question.subject}</span></div>
+      <p className="font-display text-xl font-bold leading-9 text-[#1c3945] sm:text-2xl">{question.statement}</p>
+      <section className="mt-6 rounded-xl border border-[#d7e4df] bg-[#fafcfb] p-3"><p className="text-[10px] font-bold uppercase tracking-[.12em] text-[#697c7f]">Confiança antes de confirmar</p><div className="mt-2 grid grid-cols-3 gap-2">{[{v:1,l:"Baixa"},{v:2,l:"Média"},{v:3,l:"Alta"}].map(item=><button key={item.v} type="button" onClick={()=>setConfidence(item.v)} className={"min-h-10 rounded-lg border text-xs font-bold "+(confidence===item.v?"border-[#0e5a70] bg-[#e7f4f0] text-[#0e5a70]":"border-[#dde6e3] bg-white text-[#687a7d]")}>{item.l}</button>)}</div></section>
+      <div className="mt-4 grid gap-3 sm:grid-cols-2"><button onClick={()=>choose(true)} className={"rounded-2xl border-2 px-6 py-5 text-left transition "+(draftAnswer===true?"border-[#0e5a70] bg-[#e0f0ec]":"border-[#b9d4d0] bg-[#f2f8f6]")}><span className="font-display text-lg font-extrabold text-[#0e5a70]">CERTO</span></button><button onClick={()=>choose(false)} className={"rounded-2xl border-2 px-6 py-5 text-left transition "+(draftAnswer===false?"border-[#aa683b] bg-[#f5eadf]":"border-[#dccfc0] bg-[#fdf8f0]")}><span className="font-display text-lg font-extrabold text-[#9d5b31]">ERRADO</span></button></div>
+      <div className="mt-6 flex flex-col gap-3 rounded-xl border border-[#dbe5e1] bg-[#f7faf9] p-4 sm:flex-row sm:items-center sm:justify-between"><p className="text-xs leading-5 text-[#65777a]">{simulation.telemetryEnabled?(changes?changes+" troca(s) de resposta registrada(s) neste item.":"Você pode trocar a alternativa antes de confirmar; a telemetria registrará a mudança."):"Você pode trocar a alternativa antes de confirmar. A telemetria detalhada está desativada para este curso."}</p><button disabled={draftAnswer===null||!confidence} onClick={()=>draftAnswer!==null&&confidence&&onConfirm(draftAnswer,confidence,{elapsedMs:Date.now()-simulation.questionStartedAt,changes})} className="action-button shrink-0 disabled:opacity-45">Confirmar e avançar<ChevronRight className="h-4 w-4"/></button></div>
+    </article>
+  </div>;
+}
+
+function SimulationScreen({ simulation, onAnswer, onExit }: { simulation: NonNullable<ActiveSimulation>; onAnswer: (answer: boolean, confidence: number, telemetry?: { elapsedMs: number; changes: number }) => void; onExit: () => void }) {
   const question=simulation.questions[simulation.index];
   const progress=((simulation.index+1)/simulation.questions.length)*100;
   const selectedAnswer=Object.prototype.hasOwnProperty.call(simulation.answers,question.id)?simulation.answers[question.id]:undefined;
@@ -740,7 +849,7 @@ function SimulationScreen({ simulation, onAnswer, onExit }: { simulation: NonNul
   const reviewSaved=(personalReviewsQuery.data??[]).some((item)=>item.questionKey===question.id);
   const saveForReview=()=>addReviewMutation.mutate({questionKey:question.id,snapshot:{statement:question.statement,answer:question.answer,explanation:question.explanation,discipline:question.discipline,subject:question.subject,source:question.source}},{onSuccess:()=>void personalReviewsQuery.refetch()});
   return <div className="mx-auto max-w-4xl">
-    <div className="mb-7 flex items-center justify-between"><div><p className="eyebrow">SIMULADO EM ANDAMENTO</p><p className="font-display mt-1 text-lg font-bold">Item {simulation.index+1} de {simulation.questions.length}</p></div><button className="ghost-button" onClick={onExit}><X className="h-4 w-4"/>Abandonar</button></div>
+    <div className="mb-7 flex items-center justify-between"><div><p className="eyebrow">{simulation.mode==="domain"?"PROVA DE DOMÍNIO":"SIMULADO EM ANDAMENTO"}</p><p className="font-display mt-1 text-lg font-bold">Item {simulation.index+1} de {simulation.questions.length}</p></div><button className="ghost-button" onClick={onExit}><X className="h-4 w-4"/>Abandonar</button></div>
     <div className="mb-8 h-2 overflow-hidden rounded-full bg-[#ddd5c7]"><div className="h-full bg-[#0e5a70] transition-all duration-300" style={{width:`${progress}%`}}/></div>
     <article className="shell-card mt-5 p-6 sm:p-10">
       <div className="mb-8 flex flex-wrap gap-2"><span className="rounded-lg bg-[#e4efed] px-2 py-1 text-[10px] font-bold tracking-wider text-[#0e5a70]">BLOCO {question.block}</span><span className="rounded-lg bg-[#f4ecdd] px-2 py-1 text-[10px] font-bold tracking-wider text-[#91713d]">{question.discipline}</span><span className="rounded-lg border border-[#e4ddd0] px-2 py-1 text-[10px] font-bold tracking-wider text-[#718087]">{question.difficulty}</span></div>
@@ -792,6 +901,8 @@ function SimulationResult({ result, onAgain, onClose, onReflectionSaved, onFollo
   return <div className="mx-auto max-w-5xl space-y-6">
     <section className="rounded-[1.35rem] bg-[#183542] p-7 text-white sm:p-9"><p className="text-[10px] font-bold tracking-[0.22em] text-[#9edbcf]">DEBRIEFING CONCLUÍDO</p><div className="mt-4 flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between"><div><h2 className="font-display text-4xl font-extrabold">{score}% de aproveitamento</h2><p className="mt-2 text-sm text-[#d1dfdc]">{result.correct} acertos · {result.errors} erros · {result.total} itens · {formatTime(result.elapsedSeconds)}</p></div><div className="rounded-2xl bg-white/10 p-4"><p className="text-[10px] font-bold tracking-wider text-[#9edbcf]">REGISTRO</p><p className="font-display mt-1 text-lg font-bold">+{result.correct * 8 + 15} XP</p></div></div></section>
     <section className="grid gap-4 md:grid-cols-3">{blocks.map((block) => { const metric = result.byBlock[block.id]; return <div className="shell-card p-5" key={block.id}><p className="eyebrow">{block.label}</p><p className="font-display mt-2 text-2xl font-extrabold">{percentage(metric.correct, metric.total)}%</p><p className="mt-1 text-sm text-[#64757e]">{metric.correct}/{metric.total} acertos</p></div>; })}</section>
+    {result.mode==="real_exam"&&Boolean(result.telemetry?.questions?.length)&&<section className="shell-card p-5 sm:p-6"><p className="eyebrow">TELEMETRIA DA PROVA REAL</p><h3 className="font-display mt-1 text-xl font-extrabold text-[#24434d]">Como você executou a prova</h3><div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><div className="rounded-xl bg-[#f5faf8] p-3"><p className="text-[9px] font-bold uppercase text-[#748487]">Tempo médio/item</p><p className="mt-1 text-lg font-extrabold text-[#0e5a70]">{result.telemetry?.summary?.averageSeconds??"—"}s</p></div><div className="rounded-xl bg-[#f5faf8] p-3"><p className="text-[9px] font-bold uppercase text-[#748487]">Trocas</p><p className="mt-1 text-lg font-extrabold text-[#0e5a70]">{result.telemetry?.summary?.answerChanges??0}</p></div><div className="rounded-xl bg-[#f5faf8] p-3"><p className="text-[9px] font-bold uppercase text-[#748487]">Erros com alta confiança</p><p className="mt-1 text-lg font-extrabold text-[#0e5a70]">{result.telemetry?.summary?.highConfidenceErrors??0}</p></div><div className="rounded-xl bg-[#f5faf8] p-3"><p className="text-[9px] font-bold uppercase text-[#748487]">Queda 1ª → 2ª metade</p><p className="mt-1 text-lg font-extrabold text-[#0e5a70]">{result.telemetry?.summary?.performanceDrop??0} p.p.</p></div></div></section>}
+    {result.mode==="domain"&&<section className="rounded-2xl border border-[#b8d6ce] bg-[#edf7f4] p-5"><p className="eyebrow">PROVA DE DOMÍNIO REGISTRADA</p><h3 className="font-display mt-1 text-xl font-extrabold text-[#24434d]">Este resultado virou evidência de retenção.</h3><p className="mt-2 text-sm leading-6 text-[#64777a]">O tópico só será considerado retido quando houver desempenho suficiente em momentos diferentes. A central de Inteligência recalcula o mapa após este resultado.</p></section>}
     <section className="shell-card p-5 sm:p-6">
       <div className="section-heading"><div><p className="eyebrow">REFLEXÃO PÓS-SIMULADO · 2 MIN</p><h3 className="font-display mt-1 text-xl font-extrabold text-[#24434d]">Transforme o resultado em uma decisão concreta.</h3><p className="mt-2 max-w-3xl text-sm leading-6 text-[#64777a]">Antes de seguir, identifique a principal causa do resultado e escolha o próximo passo. Isso ajuda o sistema a manter o estudo intencional, em vez de apenas acumular notas.</p></div><Brain className="hidden h-6 w-6 text-[#0e5a70] sm:block"/></div>
       <div className="mt-5 grid gap-5 lg:grid-cols-[.8fr_1.2fr]">

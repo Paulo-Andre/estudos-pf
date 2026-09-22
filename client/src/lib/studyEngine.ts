@@ -1,16 +1,30 @@
 /* Estudos PF — lógica de progresso: recompensa domínio demonstrado e preserva histórico local. */
 import { blocks, type Block, type StudyQuestion } from "@/types/study";
 
-export type AnswerRecord = { questionId: string; correct: boolean; answeredAt: string };
+export type AnswerRecord = { questionId: string; courseId?: string | null; correct: boolean; answeredAt: string; confidence?: number | null };
 export type SimulationRecord = {
   id: string;
   date: string;
   total: number;
   correct: number;
   errors: number;
+  courseId?: string | null;
+  mode?: "practice" | "domain" | "real_exam";
   elapsedSeconds: number;
   byDiscipline: Record<string, { correct: number; total: number }>;
   byBlock: Record<Block, { correct: number; total: number }>;
+  telemetry?: {
+    questions?: { questionId: string; elapsedMs: number; changes: number; confidence: number | null; correct: boolean; discipline: string; subject: string; position?: number }[];
+    summary?: {
+      averageSeconds?: number;
+      answerChanges?: number;
+      highConfidenceErrors?: number;
+      firstHalfAccuracy?: number;
+      secondHalfAccuracy?: number;
+      performanceDrop?: number;
+      slowestQuestion?: { questionId: string; seconds: number; subject: string };
+    };
+  } | null;
   reflection?: {
     confidence: number;
     primaryCause: "knowledge" | "attention" | "time" | "interpretation" | "strategy";

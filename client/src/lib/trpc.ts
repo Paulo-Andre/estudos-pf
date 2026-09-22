@@ -74,6 +74,19 @@ async function uploadImage(input: any) {
   return api("/api/v1/platform/admin/uploads/images/", { method: "POST", body: form });
 }
 
+async function uploadKnowledgeImport(input: any, endpoint: string) {
+  const file=input?.file;
+  if (!(file instanceof File)) throw new Error("Selecione um arquivo para importar.");
+  const form=new FormData();
+  form.append("file",file,file.name);
+  form.append("dryRun",input?.dryRun===false?"false":"true");
+  for (const key of ["title","objective","description","cardText","coverImageUrl","videoUrl","videoLabel","materialUrl","materialLabel","noticeKind","status","requiresReview"]) {
+    if (input?.[key] !== undefined && input?.[key] !== null) form.append(key,String(input[key]));
+  }
+  if (Array.isArray(input?.disciplineIds)) form.append("disciplineIds",input.disciplineIds.join(","));
+  return api(endpoint,{method:"POST",body:form});
+}
+
 function id(v: any) { return encodeURIComponent(String(v)); }
 
 async function queryProcedure(path: string, input: any) {
@@ -86,6 +99,8 @@ async function queryProcedure(path: string, input: any) {
     case "study.bookmarks": return api("/api/v1/study/bookmarks/");
     case "study.weeklyGoal": return api("/api/v1/study/weekly-goal/");
     case "study.learningPlan": return api("/api/v1/study/learning-plan/" + qs(input, ["courseId"]));
+    case "study.learningIntelligence": return api("/api/v1/study/intelligence/" + qs(input, ["courseId"]));
+    case "study.learningFeatures": return api("/api/v1/study/learning-features/" + qs(input, ["courseId"]));
     case "study.state": return api("/api/v1/study/state/");
     case "study.access": return api("/api/v1/courses/access/");
     case "study.courseCatalog": return api("/api/v1/courses/");
@@ -122,6 +137,7 @@ async function queryProcedure(path: string, input: any) {
     case "admin.contacts.get": { const d = await api("/api/v1/platform/admin/settings/"); return d.contact; }
     case "admin.settings.get": { const d = await api("/api/v1/platform/admin/settings/"); return d.general; }
     case "admin.competition.getSettings": return api("/api/v1/platform/admin/competition/");
+    case "admin.learningIntelligence.getSettings": return api("/api/v1/study/admin/intelligence-settings/" + qs(input, ["courseId"]));
     case "admin.competition.getMonthlyGoal": { const d = await api("/api/v1/platform/admin/competition/"); return d.monthlyGoal; }
     case "admin.disciplines.list": return api("/api/v1/knowledge/admin/disciplines/");
     case "admin.contents.list": return api("/api/v1/knowledge/admin/contents/");
@@ -201,6 +217,7 @@ async function mutationProcedure(path: string, input: any) {
     case "admin.settings.save": return api("/api/v1/platform/admin/settings/", json("PUT", { general: input }));
     case "admin.settings.uploadLogo": return uploadImage(input);
     case "admin.competition.saveSettings": return api("/api/v1/platform/admin/competition/save/", json("PUT", input));
+    case "admin.learningIntelligence.saveSettings": return api("/api/v1/study/admin/intelligence-settings/", json("PUT", input));
     case "admin.competition.saveMonthlyGoal": return api("/api/v1/platform/admin/competition/save/", json("PUT", { monthlyGoal: input }));
     case "admin.competition.clearRanking": return api("/api/v1/platform/admin/competition/clear/", json("POST", input));
     case "admin.disciplines.create": return api("/api/v1/knowledge/admin/disciplines/", json("POST", input));
@@ -212,6 +229,8 @@ async function mutationProcedure(path: string, input: any) {
     case "admin.questions.create": return api("/api/v1/knowledge/admin/questions/", json("POST", input));
     case "admin.questions.update": return api("/api/v1/knowledge/admin/questions/" + id(input.id) + "/", json("PUT", input.data));
     case "admin.questions.remove": return api("/api/v1/knowledge/admin/questions/" + id(input.id) + "/", { method: "DELETE" });
+    case "admin.questions.importXlsx": return uploadKnowledgeImport(input,"/api/v1/knowledge/admin/import/questions/");
+    case "admin.contents.importFile": return uploadKnowledgeImport(input,"/api/v1/knowledge/admin/import/contents/");
     case "admin.questions.sendToReview": return api("/api/v1/knowledge/admin/reviews/submit/", json("POST", { itemType: "question", itemId: input.id }));
     case "admin.review.decide": return api("/api/v1/knowledge/admin/reviews/" + id(input.id) + "/decision/", json("POST", { decision: input.decision, notes: input.notes }));
     case "admin.commerce.createPlan": return api("/api/v1/commerce/admin/plans/", json("POST", input));
