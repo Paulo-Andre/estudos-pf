@@ -1,5 +1,6 @@
 import json
 import re
+import zipfile
 from io import BytesIO
 
 from django.db import transaction
@@ -94,8 +95,18 @@ def _check_upload(upload,max_bytes,extensions):
 
 def _xlsx_rows(upload):
     _check_upload(upload,MAX_XLSX_BYTES,(".xlsx",))
-    upload.seek(0)
-    try:wb=load_workbook(filename=BytesIO(upload.read()),read_only=True,data_only=False)
+    upload.seek(0);raw=upload.read()
+    try:
+        with zipfile.ZipFile(BytesIO(raw)) as archive:
+            entries=archive.infolist()
+            if len(entries)>250:raise ValueError("XLSX possui estrutura interna excessiva.")
+            unpacked=sum(item.file_size for item in entries)
+            if unpacked>50*1024*1024:raise ValueError("XLSX excede o limite interno descompactado.")
+            names={item.filename for item in entries}
+            if any(name.startswith("xl/externalLinks/") for name in names) or "xl/connections.xml" in names:
+                raise ValueError("XLSX com conexões ou links externos não é aceito.")
+    except zipfile.BadZipFile as exc:raise ValueError("O arquivo não é um XLSX válido.") from exc
+    try:wb=load_workbook(filename=BytesIO(raw),read_only=True,data_only=False,keep_links=False)
     except Exception as exc:raise ValueError("Não foi possível abrir o XLSX. Verifique se o arquivo não está corrompido.") from exc
     ws=wb[wb.sheetnames[0]]
     if ws.max_row>MAX_ROWS+1:raise ValueError(f"A planilha possui mais de {MAX_ROWS} linhas de dados.")
@@ -147,6 +158,7 @@ def _discipline_ids(row):
 
 def parse_question_xlsx(upload):
     headers,rows=_xlsx_rows(upload)
+    seen=set()
     required={"enunciado","tipo","resposta"}
     missing=sorted(required-set(headers))
     if missing:raise ValueError("Colunas obrigatórias ausentes: "+", ".join(missing))
@@ -182,8 +194,10 @@ def parse_question_xlsx(upload):
                 year=int(float(row.get("ano")))
                 if year<1900 or year>2100:raise ValueError("ano fora do intervalo 1900-2100")
             content_ids=_content_ids(row)
-            duplicate=Question.objects.filter(statement__iexact=statement,question_type=qtype).exists()
-            if duplicate:warnings.append("questão idêntica já existe e será ignorada")
+            signature=(statement.casefold(),qtype)
+            duplicate=signature in seen or Question.objects.filter(statement__iexact=statement,question_type=qtype).exists()
+            seen.add(signature)
+            if duplicate:warnings.append("questão idêntica já existe no arquivo ou banco e será ignorada")
             result.append({"row":row_number,"valid":not duplicate,"skip":duplicate,"errors":[],"warnings":warnings,"data":{
                 "statement":statement,"question_type":qtype,"options_json":options,"answer_json":answer,
                 "explanation":_clean(row.get("comentario")),"difficulty":_safe_difficulty(row.get("dificuldade")),
@@ -212,6 +226,7 @@ def apply_question_import(rows,user):
 
 def parse_content_xlsx(upload):
     headers,rows=_xlsx_rows(upload)
+    seen=set()
     if "titulo" not in headers:raise ValueError("Coluna obrigatória ausente: titulo")
     result=[]
     for row_number,row in rows:
@@ -220,8 +235,10 @@ def parse_content_xlsx(upload):
             title=_clean(row.get("titulo"))
             if len(title)<3:raise ValueError("título deve ter ao menos 3 caracteres")
             discipline_ids=_discipline_ids(row)
-            duplicate=Content.objects.filter(title__iexact=title).exists()
-            if duplicate:warnings.append("conteúdo com este título já existe e será ignorado")
+            signature=title.casefold()
+            duplicate=signature in seen or Content.objects.filter(title__iexact=title).exists()
+            seen.add(signature)
+            if duplicate:warnings.append("conteúdo com este título já existe no arquivo ou banco e será ignorado")
             notice=_norm(row.get("aviso"))
             notice_kind={"novo":"new","new":"new","atualizado":"updated","updated":"updated","":"None","nenhum":"None"}.get(notice)
             if notice_kind is None:raise ValueError("aviso deve ser NENHUM, NOVO ou ATUALIZADO")
@@ -263,26 +280,33 @@ def pdf_to_content(upload,metadata):
             if not reader.decrypt(""):raise ValueError("PDF protegido por senha não pode ser importado.")
         except Exception as exc:raise ValueError("PDF protegido por senha não pode ser importado.") from exc
     if len(reader.pages)>MAX_PDF_PAGES:raise ValueError(f"PDF excede o limite de {MAX_PDF_PAGES} páginas.")
-    chunks=[]
-    total=0
+    chunks=[];raw_pages=[];total=0
     for index,page in enumerate(reader.pages,start=1):
         text=(page.extract_text() or "").replace("\x00","").strip()
         if not text:continue
+        raw_pages.append(text)
         chunk=f"Página {index}\n\n{text}"
         total+=len(chunk)
         if total>MAX_PDF_TEXT:raise ValueError("Texto extraído do PDF excede o limite permitido.")
         chunks.append(chunk)
     body="\n\n".join(chunks).strip()
+    raw_text="\n\n".join(raw_pages).strip()
     if len(body)<50:raise ValueError("O PDF não possui texto extraível suficiente. PDFs escaneados precisam de OCR antes da importação.")
-    title=_clean(metadata.get("title")) or re.sub(r"\.pdf$","",getattr(upload,"name","conteudo"),flags=re.I)
+    def marker(name):
+        match=re.search(rf"(?im)^\s*{name}\s*:\s*(.+?)\s*$",raw_text)
+        return _clean(match.group(1)) if match else ""
+    structured_body=""
+    content_match=re.search(r"(?ims)^\s*CONTEUDO\s*:\s*(.+)$",raw_text)
+    if content_match:structured_body=_clean(content_match.group(1))
+    title=_clean(metadata.get("title")) or marker("TITULO") or re.sub(r"\.pdf$","",getattr(upload,"name","conteudo"),flags=re.I)
     if len(title)<3:raise ValueError("Informe um título válido.")
     discipline_ids=_split_ids(metadata.get("disciplineIds"))
     missing=set(discipline_ids)-set(Discipline.objects.filter(id__in=discipline_ids).values_list("id",flat=True))
     if missing:raise ValueError("Disciplina(s) inexistente(s): "+", ".join(map(str,sorted(missing))))
     duplicate=Content.objects.filter(title__iexact=title).exists()
     return {
-        "title":title[:220],"objective":_clean(metadata.get("objective")),"description":_clean(metadata.get("description")),
-        "card_text":_clean(metadata.get("cardText")),"body":body,"status":_safe_status(metadata.get("status")),
+        "title":title[:220],"objective":_clean(metadata.get("objective")) or marker("OBJETIVO"),"description":_clean(metadata.get("description")) or marker("DESCRICAO"),
+        "card_text":_clean(metadata.get("cardText")) or marker("RESUMO_CARD"),"body":structured_body or body,"status":_safe_status(metadata.get("status")),
         "requires_review":_bool(metadata.get("requiresReview")),"discipline_ids":discipline_ids,"duplicate":duplicate,
         "pages":len(reader.pages),"characters":len(body),
     }
@@ -335,13 +359,16 @@ def question_template_bytes():
     wb=Workbook();ws=wb.active;ws.title="QUESTOES"
     headers=["enunciado","tipo","alternativa_a","alternativa_b","alternativa_c","alternativa_d","alternativa_e","resposta","comentario","dificuldade","banca","ano","fonte","conteudo_ids","conteudos","status","exigir_revisao"]
     ws.append(headers)
-    ws.append(["A Constituição Federal assegura o direito de reunião pacífica?","certo_errado","","","","","","CERTO","Exemplo de comentário didático.","intermediate","CEBRASPE",2025,"Prova exemplo","", "Direitos Fundamentais","draft","NÃO"])
-    ws.append(["Assinale a alternativa correta sobre o tema.","multipla_escolha","Alternativa um","Alternativa dois","Alternativa três","Alternativa quatro","","B","A alternativa B é a correta.","intermediate","FGV",2025,"Prova exemplo","","Direitos Fundamentais","draft","SIM"])
     _style_template(ws,{"A":58,"B":20,"C":28,"D":28,"E":28,"F":28,"G":28,"H":18,"I":48,"J":20,"K":18,"L":10,"M":24,"N":20,"O":34,"P":18,"Q":18})
     _list_validation(ws,"B",["certo_errado","multipla_escolha"])
     _list_validation(ws,"J",["basic","intermediate","advanced"])
     _list_validation(ws,"P",["draft","review","approved","published","inactive"])
     _list_validation(ws,"Q",["SIM","NÃO"])
+    examples=wb.create_sheet("EXEMPLOS")
+    examples.append(headers)
+    examples.append(["A Constituição Federal assegura o direito de reunião pacífica?","certo_errado","","","","","","CERTO","Exemplo de comentário didático.","intermediate","CEBRASPE",2025,"Prova exemplo","","","draft","NÃO"])
+    examples.append(["Assinale a alternativa correta sobre o tema.","multipla_escolha","Alternativa um","Alternativa dois","Alternativa três","Alternativa quatro","","B","A alternativa B é a correta.","intermediate","FGV",2025,"Prova exemplo","","","draft","SIM"])
+    _style_template(examples,{"A":58,"B":20,"C":28,"D":28,"E":28,"F":28,"G":28,"H":18,"I":48,"J":20,"K":18,"L":10,"M":24,"N":20,"O":34,"P":18,"Q":18})
     guide=wb.create_sheet("INSTRUCOES")
     guide_rows=[
         ["CAMPO","REGRA"],
@@ -353,7 +380,7 @@ def question_template_bytes():
         ["conteudos","Opcional. Títulos exatos separados por | ou ;. Use quando não souber o ID."],
         ["status","draft, review, approved, published ou inactive."],
         ["exigir_revisao","SIM ou NÃO."],
-        ["segurança","Não use fórmulas. O sistema rejeita planilhas com fórmulas e linhas inválidas antes de gravar."],
+        ["segurança","Não use fórmulas. O sistema rejeita planilhas com fórmulas, links externos e linhas inválidas antes de gravar."],
     ]
     for row in guide_rows:guide.append(row)
     _style_template(guide,{"A":26,"B":95})
@@ -363,6 +390,36 @@ def question_template_bytes():
     out=BytesIO();wb.save(out);return out.getvalue()
 
 
+def content_template_bytes():
+    wb=Workbook();ws=wb.active;ws.title="CONTEUDOS"
+    headers=["titulo","objetivo","descricao","resumo_card","corpo","disciplina_ids","disciplinas","status","exigir_revisao","aviso","capa_url","video_url","video_rotulo","material_url","material_rotulo"]
+    ws.append(headers)
+    _style_template(ws,{"A":36,"B":42,"C":48,"D":40,"E":90,"F":20,"G":28,"H":18,"I":18,"J":18,"K":34,"L":34,"M":24,"N":34,"O":24})
+    _list_validation(ws,"H",["draft","review","approved","published","inactive"])
+    _list_validation(ws,"I",["SIM","NÃO"])
+    _list_validation(ws,"J",["NENHUM","NOVO","ATUALIZADO"])
+    examples=wb.create_sheet("EXEMPLOS");examples.append(headers)
+    examples.append(["Direitos Fundamentais","Compreender os principais direitos e garantias.","Resumo do conteúdo para administração.","Texto curto exibido no cartão do aluno.","Insira aqui o conteúdo completo da aula. Pode usar parágrafos e listas em texto.","","","draft","NÃO","NENHUM","","","","",""])
+    _style_template(examples,{"A":36,"B":42,"C":48,"D":40,"E":90,"F":20,"G":28,"H":18,"I":18,"J":18,"K":34,"L":34,"M":24,"N":34,"O":24})
+    guide=wb.create_sheet("INSTRUCOES")
+    guide_rows=[
+        ["CAMPO","REGRA"],
+        ["titulo","Obrigatório. Conteúdos com título idêntico são ignorados para evitar duplicação."],
+        ["corpo","Texto principal da aula."],
+        ["disciplina_ids","Opcional. IDs separados por |, ; ou vírgula."],
+        ["disciplinas","Opcional. Siglas exatas das disciplinas separadas por | ou ;."],
+        ["status","draft, review, approved, published ou inactive."],
+        ["aviso","NENHUM, NOVO ou ATUALIZADO."],
+        ["exigir_revisao","SIM ou NÃO."],
+        ["PDF","Para PDF, envie um arquivo textual. O modelo estruturado pode usar TITULO:, OBJETIVO:, DESCRICAO:, RESUMO_CARD: e CONTEUDO:."],
+        ["segurança","Não use fórmulas. O sistema valida o arquivo inteiro antes de permitir a gravação."],
+    ]
+    for row in guide_rows:guide.append(row)
+    _style_template(guide,{"A":26,"B":95})
+    ref=wb.create_sheet("DISCIPLINAS_ATUAIS");ref.append(["id","sigla","nome","status"])
+    for item in Discipline.objects.all().order_by("name").values("id","short_name","name","status")[:5000]:ref.append([item["id"],item["short_name"],item["name"],item["status"]])
+    _style_template(ref,{"A":12,"B":20,"C":48,"D":18})
+    out=BytesIO();wb.save(out);return out.getvalue()
 def content_template_bytes():
     wb=Workbook();ws=wb.active;ws.title="CONTEUDOS"
     headers=["titulo","objetivo","descricao","resumo_card","corpo","disciplina_ids","disciplinas","status","exigir_revisao","aviso","capa_url","video_url","video_rotulo","material_url","material_rotulo"]
