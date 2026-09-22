@@ -47,6 +47,18 @@ describe("contrato da metodologia de aprendizagem", () => {
     expect(homeSource).toContain("learningPlan.interleaving.disciplines");
   });
 
+  it("mantém reflexão pós-simulado conectada ao histórico", () => {
+    expect(homeSource).toContain("REFLEXÃO PÓS-SIMULADO · 2 MIN");
+    expect(homeSource).toContain("Transforme o resultado em uma decisão concreta.");
+    expect(homeSource).toContain("simulationReflection.save");
+    expect(homeSource).toContain("Reflexão registrada");
+    expect(homeSource).toContain("Próxima ação:");
+    expect(homeSource).toContain("Seguir:");
+    expect(homeSource).toContain("onFollowReflectionAction");
+    expect(trpcSource).toContain('case "study.simulationReflection.save"');
+    expect(trpcSource).toContain("/reflection/");
+  });
+
   it("mantém endpoints REST do plano adaptativo", () => {
     expect(trpcSource).toContain('case "study.learningPlan"');
     expect(trpcSource).toContain("/api/v1/study/learning-plan/");
