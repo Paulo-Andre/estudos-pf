@@ -86,6 +86,7 @@ class LearningMethodologyTests(TestCase):
         self.assertEqual(record["reflection"]["nextAction"],"review")
 
         other=get_user_model().objects.create_user("other-meta","other-meta@example.com","Aluno-F0rte!2026")
+        CourseEnrollment.objects.create(user=other,course=self.course,created_by=self.admin,start_at=timezone.now()-timedelta(days=1),expires_at=timezone.now()+timedelta(days=30))
         other_client=APIClient();other_client.force_authenticate(other)
         forbidden=other_client.get("/api/v1/study/simulations/meta-sim-1/reflection/")
         self.assertEqual(forbidden.status_code,404)
