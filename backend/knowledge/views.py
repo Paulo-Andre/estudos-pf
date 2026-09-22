@@ -189,7 +189,7 @@ class AdminContentImportView(APIView):
             if upload.name.lower().endswith(".pdf"):
                 data=pdf_to_content(upload,request.data)
                 preview={"row":1,"status":"skip" if data["duplicate"] else "valid","label":data["title"],"errors":[],"warnings":["conteúdo com este título já existe e será ignorado"] if data["duplicate"] else []}
-                summary={"validRows":0 if data["duplicate"] else 1,"skippedRows":1 if data["duplicate"] else 0,"invalidRows":0,"preview":[preview],"pdf":{"pages":data["pages"],"characters":data["characters"]}}
+                summary={"validRows":0 if data["duplicate"] else 1,"skippedRows":1 if data["duplicate"] else 0,"invalidRows":0,"preview":[preview],"pdf":{"pages":data["pages"],"characters":data["characters"],"textPreview":data["body"][:1200]}}
                 if dry_run:return Response({"kind":"contents","format":"pdf","fileName":upload.name,"dryRun":True,**summary})
                 created_id=apply_pdf_content(data,request.user)
                 return Response({"kind":"contents","format":"pdf","fileName":upload.name,"dryRun":False,"createdIds":[created_id] if created_id else [],**summary},status=201)
