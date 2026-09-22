@@ -87,6 +87,7 @@ async function queryProcedure(path: string, input: any) {
     case "study.weeklyGoal": return api("/api/v1/study/weekly-goal/");
     case "study.learningPlan": return api("/api/v1/study/learning-plan/" + qs(input, ["courseId"]));
     case "study.learningIntelligence": return api("/api/v1/study/intelligence/" + qs(input, ["courseId"]));
+    case "study.learningFeatures": return api("/api/v1/study/learning-features/" + qs(input, ["courseId"]));
     case "study.state": return api("/api/v1/study/state/");
     case "study.access": return api("/api/v1/courses/access/");
     case "study.courseCatalog": return api("/api/v1/courses/");
@@ -123,6 +124,7 @@ async function queryProcedure(path: string, input: any) {
     case "admin.contacts.get": { const d = await api("/api/v1/platform/admin/settings/"); return d.contact; }
     case "admin.settings.get": { const d = await api("/api/v1/platform/admin/settings/"); return d.general; }
     case "admin.competition.getSettings": return api("/api/v1/platform/admin/competition/");
+    case "admin.learningIntelligence.getSettings": return api("/api/v1/study/admin/intelligence-settings/" + qs(input, ["courseId"]));
     case "admin.competition.getMonthlyGoal": { const d = await api("/api/v1/platform/admin/competition/"); return d.monthlyGoal; }
     case "admin.disciplines.list": return api("/api/v1/knowledge/admin/disciplines/");
     case "admin.contents.list": return api("/api/v1/knowledge/admin/contents/");
@@ -202,6 +204,7 @@ async function mutationProcedure(path: string, input: any) {
     case "admin.settings.save": return api("/api/v1/platform/admin/settings/", json("PUT", { general: input }));
     case "admin.settings.uploadLogo": return uploadImage(input);
     case "admin.competition.saveSettings": return api("/api/v1/platform/admin/competition/save/", json("PUT", input));
+    case "admin.learningIntelligence.saveSettings": return api("/api/v1/study/admin/intelligence-settings/", json("PUT", input));
     case "admin.competition.saveMonthlyGoal": return api("/api/v1/platform/admin/competition/save/", json("PUT", { monthlyGoal: input }));
     case "admin.competition.clearRanking": return api("/api/v1/platform/admin/competition/clear/", json("POST", input));
     case "admin.disciplines.create": return api("/api/v1/knowledge/admin/disciplines/", json("POST", input));
