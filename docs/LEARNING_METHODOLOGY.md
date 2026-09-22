@@ -1,114 +1,106 @@
 # Metodologia de aprendizagem — Ciclo de Domínio
 
-A plataforma deve ajudar o aluno a tomar a próxima decisão de estudo com base em evidências do próprio desempenho. A interface não deve premiar apenas tempo de tela ou consumo de conteúdo.
+A experiência do aluno segue um ciclo adaptativo:
 
-## Ciclo principal
+1. **Aprender** — compreensão guiada, exemplos e checkpoint de recuperação ativa.
+2. **Praticar** — responder sem consultar, registrando também a confiança na resposta.
+3. **Revisar** — erros e itens marcados entram em repetição espaçada.
+4. **Simular** — prática de prova mede domínio, tempo, estabilidade e fraquezas.
+5. **Recalibrar** — o dashboard escolhe a próxima melhor ação com base nos dados recentes.
 
-1. **Aprender** — compreensão guiada, exemplos e conexão com conhecimento prévio.
-2. **Recuperar** — tentar lembrar sem consultar imediatamente após o estudo.
-3. **Praticar** — responder questões e aplicar a ideia em contexto diferente.
-4. **Revisar** — repetição espaçada dos itens que ainda exigem esforço.
-5. **Simular** — prática em condição de prova e diagnóstico das fraquezas.
-6. **Recalibrar** — erros e desempenho alteram as próximas prioridades.
+## Princípios usados
+
+- recuperação ativa antes de releitura;
+- repetição espaçada com `Errei / Difícil / Bom / Fácil`;
+- interleaving: alternância de disciplinas em vez de blocos longos da mesma matéria;
+- metacognição: confiança baixa/média/alta comparada com desempenho real;
+- prática deliberada nos pontos fracos;
+- simulados como diagnóstico, não apenas nota;
+- intensidade ajustada pela proximidade da prova;
+- sessão recomendada de 50 minutos.
+
+## Sessão recomendada
+
+O backend monta uma sessão de 50 minutos de acordo com a fase:
+
+### Base
+- 5 min: revisão/aquecimento;
+- 25 min: aprendizagem;
+- 15 min: questões;
+- 5 min: fechamento de memória.
+
+### Acelerado
+- 10 min: revisão espaçada;
+- 20 min: conteúdo prioritário;
+- 15 min: questões;
+- 5 min: fechamento.
+
+### Reta final
+- 15 min: revisão espaçada;
+- 20 min: questões focais;
+- 10 min: mini diagnóstico;
+- 5 min: fechamento.
 
 ## Dashboard
 
-O dashboard deve responder primeiro à pergunta: **“o que devo fazer agora?”**
+O painel deve responder à pergunta **“o que é melhor eu fazer agora?”**, priorizando:
 
-A ordem recomendada é:
+1. revisões vencidas;
+2. fraqueza detectada;
+3. próxima aula;
+4. simulado diagnóstico;
+5. planejamento semanal.
 
-- revisões vencidas;
-- recuperação ativa em disciplina fraca;
-- continuidade de conteúdo;
-- simulado diagnóstico;
-- organização da semana.
-
-Indicadores de XP e gamificação são secundários em relação a prontidão, revisões, metas de questões e constância.
+A prontidão é um indicador de apoio ao estudo, não uma previsão de aprovação.
 
 ## Conteúdo
 
-Uma aula não deve ser tratada como concluída apenas porque foi aberta ou rolada até o fim.
+Uma aula não deve ser tratada como concluída apenas por leitura. Sempre que possível:
 
-Sempre que possível, a conclusão exige:
+- tentar explicar sem consultar;
+- responder um checkpoint;
+- corrigir lacunas;
+- registrar anotação curta;
+- depois concluir.
 
-- um desafio de compreensão;
-- uma tentativa de recuperação sem consulta;
-- correção do erro antes de avançar.
+## Revisão
 
-Apostilas e aulas editadas devem manter a mesma regra pedagógica.
+Itens errados entram automaticamente na fila. A resposta do aluno define o próximo intervalo:
 
-## Questões e erros
-
-Erro é dado de aprendizagem, não punição.
-
-Questões erradas devem alimentar automaticamente a fila privada de revisão quando houver informação suficiente para reconstruir o item com segurança.
-
-O feedback deve explicar o raciocínio e indicar o conceito relacionado, evitando apenas informar o gabarito.
-
-## Repetição espaçada
-
-A fila de revisão usa quatro avaliações:
-
-- **Errei** — retorna em cerca de 10 minutos e reinicia a sequência.
-- **Difícil** — intervalo curto.
-- **Bom** — intervalo padrão crescente.
-- **Fácil** — intervalo maior.
-
-O aluno deve tentar recuperar a resposta **antes** de avaliar a dificuldade.
-
-## Planejamento semanal
-
-O roteiro deve favorecer:
-
-- blocos de 25–50 minutos;
-- objetivo claro por bloco;
-- 2–5 minutos finais de recuperação sem consulta;
-- alternância entre disciplinas (interleaving);
-- mais exposição a áreas fracas sem abandonar as demais.
-
-Evitar agendas excessivamente rígidas ou volume inviável.
+- **Errei:** volta rapidamente;
+- **Difícil:** intervalo curto;
+- **Bom:** intervalo crescente;
+- **Fácil:** intervalo maior.
 
 ## Simulados
 
-Três usos diferentes:
+Há três usos distintos:
 
-- **10 questões — Diagnóstico:** detectar lacunas rapidamente.
-- **20 questões — Treino de domínio:** consolidar conteúdo e ritmo.
-- **60 questões — Prova completa:** resistência, tempo e estratégia.
+- diagnóstico curto;
+- treino de domínio;
+- prova completa.
 
-Quando há revisões vencidas, o sistema pode recomendar resolvê-las antes de um simulado longo.
+Quando há uma fraqueza clara, o sistema oferece treino focal de 10 questões nessa disciplina. Depois, o aluno deve voltar a questões misturadas para preservar a capacidade de alternar contexto.
 
-Erros do simulado entram automaticamente na repetição espaçada.
+## Roteiro semanal
 
-## Data da prova
+O sistema sugere até três disciplinas em sequência de interleaving, começando por uma fraqueza quando houver evidência suficiente. A sugestão não substitui o controle do aluno: o roteiro continua editável.
 
-Quando o aluno informa a data da prova, o sistema pode mudar a intensidade informativa:
+## Metacognição
 
-- mais de 90 dias: construção de base;
-- 31–90 dias: ritmo acelerado;
-- até 30 dias: reta final.
+Antes de responder, o aluno informa sua confiança. O sistema compara percepção e acerto para detectar:
 
-Isso não deve incentivar carga excessiva; serve para priorização.
+- excesso de confiança;
+- subestimação;
+- calibração adequada.
 
-## Regras para novos conteúdos
+Isso ajuda a combater a falsa sensação de domínio produzida por releitura passiva.
 
-Toda nova aula deve, sempre que possível, ter:
+## Regras de produto
 
-- objetivo explícito;
-- explicação em blocos curtos;
-- exemplo aplicado;
-- atenção de prova;
-- desafio de recuperação;
-- resposta comentada;
-- ligação com questão ou revisão.
-
-Toda nova questão deve ter explicação suficiente para transformar o erro em aprendizagem.
-
-## Princípios de UX pedagógica
-
-- reduzir escolhas quando há uma próxima ação evidente;
-- nunca esconder ao aluno por que uma ação foi recomendada;
-- mostrar progresso sem transformar XP em objetivo principal;
-- manter controles acessíveis em celular;
-- evitar notificações ou mecânicas que estimulem uso compulsivo;
-- permitir ao aluno ignorar uma recomendação e escolher outra atividade.
+- recomendações devem ser explicáveis;
+- o aluno mantém controle sobre suas escolhas;
+- não criar punição por quebrar sequência;
+- não incentivar estudo excessivo;
+- priorizar consistência e qualidade da recuperação;
+- mobile deve manter todas as ações pedagógicas essenciais acessíveis.
