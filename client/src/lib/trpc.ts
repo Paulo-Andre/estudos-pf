@@ -86,6 +86,7 @@ async function queryProcedure(path: string, input: any) {
     case "study.bookmarks": return api("/api/v1/study/bookmarks/");
     case "study.weeklyGoal": return api("/api/v1/study/weekly-goal/");
     case "study.learningPlan": return api("/api/v1/study/learning-plan/" + qs(input, ["courseId"]));
+    case "study.learningIntelligence": return api("/api/v1/study/intelligence/" + qs(input, ["courseId"]));
     case "study.state": return api("/api/v1/study/state/");
     case "study.access": return api("/api/v1/courses/access/");
     case "study.courseCatalog": return api("/api/v1/courses/");
