@@ -599,6 +599,26 @@ function Dashboard({ state, modules, contestName, coverImageUrl, panelLabel, pan
 
     {learningPlan && <section className="shell-card p-5 sm:p-6"><div className="section-heading"><div><p className="eyebrow">CICLO DE DOMÍNIO</p><h3 className="font-display mt-1 text-xl font-extrabold text-[#173d4a]">Aprenda em ciclos, não em maratonas.</h3><p className="mt-2 max-w-2xl text-sm leading-6 text-[#64777a]">O sistema equilibra compreensão, recuperação ativa, repetição espaçada e prática de prova.</p></div><span className="rounded-full bg-[#eaf5f2] px-3 py-1.5 text-[10px] font-bold text-[#0e5a70]">metodologia adaptativa</span></div><div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{learningPlan.method.steps.map((step,index)=><article key={step.id} className="rounded-2xl border border-[#dfe9e5] bg-[#fbfdfc] p-4"><div className="flex items-center justify-between"><span className="grid h-8 w-8 place-items-center rounded-xl bg-[#e9f4f1] text-xs font-extrabold text-[#0e5a70]">{index+1}</span><span className="text-[9px] font-bold uppercase tracking-[.12em] text-[#879497]">{step.principle}</span></div><h4 className="font-display mt-3 font-extrabold text-[#274650]">{step.label}</h4><p className="mt-1 text-xs leading-5 text-[#6d7d80]">{step.status}</p></article>)}</div></section>}
 
+    {learningPlan && <section className="shell-card p-5 sm:p-6">
+      <div className="section-heading">
+        <div>
+          <p className="eyebrow">PLANO DE HOJE</p>
+          <h3 className="font-display mt-1 text-xl font-extrabold text-[#173d4a]">Faça na ordem certa.</h3>
+          <p className="mt-2 text-sm leading-6 text-[#64777a]">O sistema reduz decisões e prioriza memória vencida, fraquezas e avanço de conteúdo.</p>
+        </div>
+        {learningPlan.metrics.examDays!==null&&learningPlan.metrics.examDays!==undefined&&learningPlan.metrics.examDays>=0?<span className="rounded-full bg-[#fff5e7] px-3 py-1.5 text-[10px] font-bold text-[#91631b]">{learningPlan.metrics.examDays} dia{learningPlan.metrics.examDays===1?"":"s"} para a prova</span>:null}
+      </div>
+      <div className="mt-5 grid gap-3 lg:grid-cols-2">
+        {learningPlan.recommendations.slice(0,4).map((action,index)=><button key={action.type+"-"+index} type="button" onClick={()=>onLearningAction(action)} className="group flex items-start gap-3 rounded-2xl border border-[#dfe9e5] bg-[#fbfdfc] p-4 text-left transition hover:-translate-y-0.5 hover:border-[#a6cdc3] hover:bg-white">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#eaf5f2] font-display text-sm font-extrabold text-[#0e5a70]">{index+1}</span>
+          <span className="min-w-0 flex-1">
+            <span className="block font-display text-sm font-extrabold text-[#274650]">{action.title}</span>
+            <span className="mt-1 block text-xs leading-5 text-[#6d7d80]">{action.detail}</span>
+            <span className="mt-2 inline-flex items-center gap-1 text-xs font-bold text-[#0e5a70]">{action.cta}<ChevronRight className="h-3.5 w-3.5 transition group-hover:translate-x-1"/></span>
+          </span>
+        </button>)}
+      </div>
+    </section>}
     <section className="grid gap-4 xl:grid-cols-[1.15fr_.85fr]">
       <div className="shell-card overflow-hidden p-5 sm:p-6"><div className="section-heading"><div><p className="eyebrow">CONTINUE DE ONDE PAROU</p><h3 className="font-display mt-1 text-xl font-extrabold text-[#173d4a]">{continueItem ? continueItem.title.replace(/^[^—]+—\s*/, "") : "Sua próxima aula está pronta"}</h3><p className="mt-2 max-w-2xl text-sm leading-6 text-[#64777a]">{continueItem?.progress?.status==="started"?"Você já começou este conteúdo. Retome sem procurar novamente onde estava.":continueItem?"Siga para a próxima aula disponível e mantenha sua sequência de estudo.":"Assim que houver conteúdo liberado, ele aparecerá aqui."}</p></div><div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-[#e8f5f1] text-[#0e5a70]"><BookOpen className="h-5 w-5"/></div></div>{continueItem&&<button className="action-button mt-5 w-full sm:w-auto" onClick={()=>onOpenScheduledContent(continueItem.id)}>Continuar aula <ChevronRight className="h-4 w-4"/></button>}</div>
       <button type="button" onClick={onOpenPlanner} className="soft-panel group flex min-h-44 flex-col justify-between p-5 text-left transition hover:-translate-y-0.5 hover:border-[#9fcfc4] sm:p-6"><div className="flex items-start justify-between gap-3"><div><p className="eyebrow">PLANEJAMENTO</p><h3 className="font-display mt-1 text-xl font-extrabold text-[#173d4a]">Organize sua semana</h3></div><CalendarClock className="h-5 w-5 text-[#0e5a70]"/></div><div><p className="text-sm leading-6 text-[#60777a]">Distribua disciplinas por dia e veja seu plano em uma única tela.</p><span className="mt-4 inline-flex items-center gap-1 text-sm font-bold text-[#0e5a70]">Abrir roteiro <ChevronRight className="h-4 w-4 transition group-hover:translate-x-1"/></span></div></button>
