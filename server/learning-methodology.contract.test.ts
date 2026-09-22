@@ -53,6 +53,8 @@ describe("contrato da metodologia de aprendizagem", () => {
     expect(homeSource).toContain("simulationReflection.save");
     expect(homeSource).toContain("Reflexão registrada");
     expect(homeSource).toContain("Próxima ação:");
+    expect(homeSource).toContain("Seguir:");
+    expect(homeSource).toContain("onFollowReflectionAction");
     expect(trpcSource).toContain('case "study.simulationReflection.save"');
     expect(trpcSource).toContain("/reflection/");
   });
