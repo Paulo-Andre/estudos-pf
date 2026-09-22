@@ -1,15 +1,17 @@
 from datetime import date
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
+from rest_framework import permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from audit.models import AdminAuditLog
 from courses.models import Course
 from courses.permissions import HasContestAccess,HasStudyAccess
 from knowledge.models import Content,Discipline,Question
 from knowledge.services import can_use_question,question_payload
 from .advanced_services import course_progress_payload,daily_quick_check,dismiss_daily_quick_check,mark_content_opened,mark_review_mastered,queue_review,rate_review,remove_review_item,remove_roadmap_item,resume_content,roadmap_payload,save_roadmap_item
-from .models import SimulationRecord,SimulationReflection,StudyBookmark,StudyNote,StudyReviewItem,StudyRoadmapItem
-from .intelligence_services import learning_intelligence
+from .models import LearningIntelligenceSettings,SimulationRecord,SimulationReflection,StudyBookmark,StudyNote,StudyReviewItem,StudyRoadmapItem
+from .intelligence_services import learning_intelligence,learning_settings,learning_settings_payload
 from .learning_services import learning_plan,queue_question_error
 from .services import answer,complete,simulation_detail,state,submit_simulation
 
@@ -27,7 +29,8 @@ class AnswerView(APIView):
             try:confidence=int(raw_confidence)
             except (TypeError,ValueError):return Response({"detail":"Confiança deve ser 1, 2 ou 3."},status=400)
             if confidence not in (1,2,3):return Response({"detail":"Confiança deve ser 1, 2 ou 3."},status=400)
-        payload=answer(request.user,qid,correct,confidence)
+        course=Course.objects.filter(pk=request.data.get("courseId")).first() if request.data.get("courseId") else None
+        payload=answer(request.user,qid,correct,confidence,course)
         if not correct:queue_question_error(request.user,qid,source="answer_error")
         return Response(payload)
 class CompleteView(APIView):
@@ -200,6 +203,56 @@ class LearningIntelligenceView(APIView):
         try:return Response(learning_intelligence(request.user,course))
         except PermissionError as exc:return Response({"detail":str(exc)},status=403)
 
+
+class LearningFeaturesView(APIView):
+    permission_classes=[HasStudyAccess]
+    def get(self,request):
+        course=get_object_or_404(Course,pk=request.query_params.get("courseId"))
+        try:
+            from courses.permissions import has_active_enrollment
+            if not has_active_enrollment(request.user,course.id):raise PermissionError("Matrícula vigente necessária.")
+            return Response(learning_settings_payload(learning_settings(course)))
+        except PermissionError as exc:return Response({"detail":str(exc)},status=403)
+
+class AdminLearningSettingsView(APIView):
+    permission_classes=[permissions.IsAdminUser]
+    def get(self,request):
+        course=get_object_or_404(Course,pk=request.query_params.get("courseId"))
+        return Response({"courseId":course.id,"courseTitle":course.title,**learning_settings_payload(learning_settings(course))})
+    def put(self,request):
+        course=get_object_or_404(Course,pk=request.data.get("courseId"))
+        settings=learning_settings(course)
+        bool_fields={
+            "enabled":"is_active","radarEnabled":"radar_enabled","errorCoachEnabled":"error_coach_enabled",
+            "domainProofEnabled":"domain_proof_enabled","masteryMapEnabled":"mastery_map_enabled",
+            "realExamEnabled":"real_exam_enabled","telemetryEnabled":"telemetry_enabled",
+        }
+        number_fields={
+            "diagnosticMinAnswers":("diagnostic_min_answers",3,50),
+            "domainProofQuestionCount":("domain_proof_question_count",3,20),
+            "realExamMinQuestions":("real_exam_min_questions",5,100),
+            "realExamQuestionCount":("real_exam_question_count",10,200),
+            "validatingScoreThreshold":("validating_score_threshold",40,90),
+            "retainedScoreThreshold":("retained_score_threshold",60,100),
+            "retentionMinCorrectDays":("retention_min_correct_days",2,7),
+            "retentionMinSpanDays":("retention_min_span_days",1,30),
+            "retainedRecheckDays":("retained_recheck_days",3,60),
+        }
+        for src,dst in bool_fields.items():
+            if src in request.data:setattr(settings,dst,bool(request.data[src]))
+        for src,(dst,minimum,maximum) in number_fields.items():
+            if src not in request.data:continue
+            try:value=int(request.data[src])
+            except (TypeError,ValueError):return Response({"detail":f"{src} deve ser numérico."},status=400)
+            if value<minimum or value>maximum:return Response({"detail":f"{src} deve ficar entre {minimum} e {maximum}."},status=400)
+            setattr(settings,dst,value)
+        if settings.retained_score_threshold<=settings.validating_score_threshold:
+            return Response({"detail":"O limite de domínio retido deve ser maior que o limite de validação."},status=400)
+        if settings.real_exam_question_count<settings.real_exam_min_questions:
+            return Response({"detail":"A quantidade da Prova Real deve ser maior ou igual ao mínimo configurado."},status=400)
+        settings.updated_by=request.user;settings.save()
+        AdminAuditLog.objects.create(actor=request.user,action="CONFIGURACAO_INTELIGENCIA_ESTUDO",detail=f"Regras de Inteligência atualizadas para {course.id}.")
+        return Response({"courseId":course.id,"courseTitle":course.title,**learning_settings_payload(settings)})
 
 class SimulationReflectionView(APIView):
     permission_classes=[HasContestAccess]
