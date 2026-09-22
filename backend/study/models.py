@@ -40,6 +40,31 @@ class SimulationRecord(models.Model):
     by_discipline=models.JSONField(default=dict)
     by_block=models.JSONField(default=dict)
 
+class SimulationReflection(models.Model):
+    class Cause(models.TextChoices):
+        KNOWLEDGE="knowledge","Conteúdo"
+        ATTENTION="attention","Atenção"
+        TIME="time","Tempo"
+        INTERPRETATION="interpretation","Interpretação"
+        STRATEGY="strategy","Estratégia"
+    class NextAction(models.TextChoices):
+        REVIEW="review","Revisar erros"
+        PRACTICE="practice","Praticar questões"
+        CONTENT="content","Retomar conteúdo"
+        TIME_STRATEGY="time_strategy","Treinar gestão de tempo"
+        SIMULATE="simulate","Novo simulado"
+    simulation=models.OneToOneField(SimulationRecord,on_delete=models.CASCADE,related_name="reflection")
+    confidence=models.PositiveSmallIntegerField(default=3)
+    primary_cause=models.CharField(max_length=24,choices=Cause.choices)
+    next_action=models.CharField(max_length=24,choices=NextAction.choices)
+    note=models.CharField(max_length=600,blank=True,default="")
+    created_at=models.DateTimeField(auto_now_add=True)
+    updated_at=models.DateTimeField(auto_now=True)
+    class Meta:
+        constraints=[
+            models.CheckConstraint(condition=models.Q(confidence__gte=1,confidence__lte=5),name="reflection_confidence_valid"),
+        ]
+
 class StudyNote(models.Model):
     id=models.BigAutoField(primary_key=True)
     user=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.CASCADE,related_name="study_notes")
