@@ -102,6 +102,14 @@ class LearningMethodologyTests(TestCase):
         },format="json")
         self.assertEqual(response.status_code,400)
 
+    def test_course_question_payload_exposes_domain_metadata(self):
+        client=APIClient();client.force_authenticate(self.user)
+        response=client.get(f"/api/v1/knowledge/courses/{self.course.id}/questions/")
+        self.assertEqual(response.status_code,200)
+        self.assertEqual(response.data[0]["discipline"],"Constitucional")
+        self.assertIn("Direitos fundamentais",response.data[0]["subject"])
+        self.assertIn(self.content.id,response.data[0]["contentIds"])
+
     def test_learning_intelligence_creates_radar_and_mastery_map(self):
         client=APIClient();client.force_authenticate(self.user)
         response=client.get(f"/api/v1/study/intelligence/?courseId={self.course.id}")
