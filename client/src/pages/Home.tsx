@@ -782,7 +782,36 @@ function Simulations({ onStart, state, learningPlan, notice, strictReviewMode, c
   </div>;
 }
 
-function SimulationScreen({ simulation, onAnswer, onExit }: { simulation: NonNullable<ActiveSimulation>; onAnswer: (answer: boolean, confidence: number) => void; onExit: () => void }) {
+function RealExamScreen({ simulation, onConfirm, onExit }: { simulation: NonNullable<ActiveSimulation>; onConfirm: (answer: boolean, confidence: number, telemetry: { elapsedMs: number; changes: number }) => void; onExit: () => void }) {
+  const question=simulation.questions[simulation.index];
+  const progress=((simulation.index+1)/simulation.questions.length)*100;
+  const [draftAnswer,setDraftAnswer]=useState<boolean|null>(null);
+  const [confidence,setConfidence]=useState<number|null>(null);
+  const [changes,setChanges]=useState(0);
+  const [elapsedSeconds,setElapsedSeconds]=useState(0);
+  useEffect(()=>{
+    setDraftAnswer(null);
+    setConfidence(null);
+    setChanges(0);
+    setElapsedSeconds(Math.max(0,Math.floor((Date.now()-simulation.questionStartedAt)/1000)));
+    const timer=window.setInterval(()=>setElapsedSeconds(Math.max(0,Math.floor((Date.now()-simulation.questionStartedAt)/1000))),1000);
+    return ()=>window.clearInterval(timer);
+  },[question.id,simulation.questionStartedAt]);
+  const choose=(value:boolean)=>{setDraftAnswer(current=>{if(current!==null&&current!==value)setChanges(total=>total+1);return value;});};
+  return <div className="mx-auto max-w-4xl">
+    <div className="mb-7 flex items-center justify-between gap-3"><div><p className="eyebrow">MODO PROVA REAL · SEM FEEDBACK</p><p className="font-display mt-1 text-lg font-bold">Item {simulation.index+1} de {simulation.questions.length}</p></div><div className="flex items-center gap-2"><span className="rounded-lg border border-[#d8e2de] bg-white px-3 py-2 text-xs font-bold text-[#526d73]"><Clock3 className="mr-1 inline h-3.5 w-3.5"/>{formatTime(elapsedSeconds)}</span><button className="ghost-button" onClick={onExit}><X className="h-4 w-4"/>Abandonar</button></div></div>
+    <div className="mb-8 h-2 overflow-hidden rounded-full bg-[#ddd5c7]"><div className="h-full bg-[#0e5a70] transition-all duration-300" style={{width:progress+"%"}}/></div>
+    <article className="shell-card p-6 sm:p-10">
+      <div className="mb-7 flex flex-wrap gap-2"><span className="rounded-lg bg-[#e4efed] px-2 py-1 text-[10px] font-bold tracking-wider text-[#0e5a70]">{question.discipline}</span><span className="rounded-lg border border-[#e4ddd0] px-2 py-1 text-[10px] font-bold tracking-wider text-[#718087]">{question.subject}</span></div>
+      <p className="font-display text-xl font-bold leading-9 text-[#1c3945] sm:text-2xl">{question.statement}</p>
+      <section className="mt-6 rounded-xl border border-[#d7e4df] bg-[#fafcfb] p-3"><p className="text-[10px] font-bold uppercase tracking-[.12em] text-[#697c7f]">Confiança antes de confirmar</p><div className="mt-2 grid grid-cols-3 gap-2">{[{v:1,l:"Baixa"},{v:2,l:"Média"},{v:3,l:"Alta"}].map(item=><button key={item.v} type="button" onClick={()=>setConfidence(item.v)} className={"min-h-10 rounded-lg border text-xs font-bold "+(confidence===item.v?"border-[#0e5a70] bg-[#e7f4f0] text-[#0e5a70]":"border-[#dde6e3] bg-white text-[#687a7d]")}>{item.l}</button>)}</div></section>
+      <div className="mt-4 grid gap-3 sm:grid-cols-2"><button onClick={()=>choose(true)} className={"rounded-2xl border-2 px-6 py-5 text-left transition "+(draftAnswer===true?"border-[#0e5a70] bg-[#e0f0ec]":"border-[#b9d4d0] bg-[#f2f8f6]")}><span className="font-display text-lg font-extrabold text-[#0e5a70]">CERTO</span></button><button onClick={()=>choose(false)} className={"rounded-2xl border-2 px-6 py-5 text-left transition "+(draftAnswer===false?"border-[#aa683b] bg-[#f5eadf]":"border-[#dccfc0] bg-[#fdf8f0]")}><span className="font-display text-lg font-extrabold text-[#9d5b31]">ERRADO</span></button></div>
+      <div className="mt-6 flex flex-col gap-3 rounded-xl border border-[#dbe5e1] bg-[#f7faf9] p-4 sm:flex-row sm:items-center sm:justify-between"><p className="text-xs leading-5 text-[#65777a]">{changes?changes+" troca(s) de resposta registrada(s) neste item.":"Você pode trocar a alternativa antes de confirmar; a telemetria registrará a mudança."}</p><button disabled={draftAnswer===null||!confidence} onClick={()=>draftAnswer!==null&&confidence&&onConfirm(draftAnswer,confidence,{elapsedMs:Date.now()-simulation.questionStartedAt,changes})} className="action-button shrink-0 disabled:opacity-45">Confirmar e avançar<ChevronRight className="h-4 w-4"/></button></div>
+    </article>
+  </div>;
+}
+
+function SimulationScreen({ simulation, onAnswer, onExit }: { simulation: NonNullable<ActiveSimulation>; onAnswer: (answer: boolean, confidence: number, telemetry?: { elapsedMs: number; changes: number }) => void; onExit: () => void }) {
   const question=simulation.questions[simulation.index];
   const progress=((simulation.index+1)/simulation.questions.length)*100;
   const selectedAnswer=Object.prototype.hasOwnProperty.call(simulation.answers,question.id)?simulation.answers[question.id]:undefined;
@@ -795,7 +824,7 @@ function SimulationScreen({ simulation, onAnswer, onExit }: { simulation: NonNul
   const reviewSaved=(personalReviewsQuery.data??[]).some((item)=>item.questionKey===question.id);
   const saveForReview=()=>addReviewMutation.mutate({questionKey:question.id,snapshot:{statement:question.statement,answer:question.answer,explanation:question.explanation,discipline:question.discipline,subject:question.subject,source:question.source}},{onSuccess:()=>void personalReviewsQuery.refetch()});
   return <div className="mx-auto max-w-4xl">
-    <div className="mb-7 flex items-center justify-between"><div><p className="eyebrow">SIMULADO EM ANDAMENTO</p><p className="font-display mt-1 text-lg font-bold">Item {simulation.index+1} de {simulation.questions.length}</p></div><button className="ghost-button" onClick={onExit}><X className="h-4 w-4"/>Abandonar</button></div>
+    <div className="mb-7 flex items-center justify-between"><div><p className="eyebrow">{simulation.mode==="domain"?"PROVA DE DOMÍNIO":"SIMULADO EM ANDAMENTO"}</p><p className="font-display mt-1 text-lg font-bold">Item {simulation.index+1} de {simulation.questions.length}</p></div><button className="ghost-button" onClick={onExit}><X className="h-4 w-4"/>Abandonar</button></div>
     <div className="mb-8 h-2 overflow-hidden rounded-full bg-[#ddd5c7]"><div className="h-full bg-[#0e5a70] transition-all duration-300" style={{width:`${progress}%`}}/></div>
     <article className="shell-card mt-5 p-6 sm:p-10">
       <div className="mb-8 flex flex-wrap gap-2"><span className="rounded-lg bg-[#e4efed] px-2 py-1 text-[10px] font-bold tracking-wider text-[#0e5a70]">BLOCO {question.block}</span><span className="rounded-lg bg-[#f4ecdd] px-2 py-1 text-[10px] font-bold tracking-wider text-[#91713d]">{question.discipline}</span><span className="rounded-lg border border-[#e4ddd0] px-2 py-1 text-[10px] font-bold tracking-wider text-[#718087]">{question.difficulty}</span></div>
