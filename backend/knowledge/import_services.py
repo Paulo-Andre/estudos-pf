@@ -420,31 +420,3 @@ def content_template_bytes():
     for item in Discipline.objects.all().order_by("name").values("id","short_name","name","status")[:5000]:ref.append([item["id"],item["short_name"],item["name"],item["status"]])
     _style_template(ref,{"A":12,"B":20,"C":48,"D":18})
     out=BytesIO();wb.save(out);return out.getvalue()
-def content_template_bytes():
-    wb=Workbook();ws=wb.active;ws.title="CONTEUDOS"
-    headers=["titulo","objetivo","descricao","resumo_card","corpo","disciplina_ids","disciplinas","status","exigir_revisao","aviso","capa_url","video_url","video_rotulo","material_url","material_rotulo"]
-    ws.append(headers)
-    ws.append(["Direitos Fundamentais","Compreender os principais direitos e garantias.","Resumo do conteúdo para administração.","Texto curto exibido no cartão do aluno.","Insira aqui o conteúdo completo da aula. Pode usar parágrafos e listas em texto.","","const","draft","NÃO","NENHUM","","","","",""])
-    _style_template(ws,{"A":36,"B":42,"C":48,"D":40,"E":90,"F":20,"G":28,"H":18,"I":18,"J":18,"K":34,"L":34,"M":24,"N":34,"O":24})
-    _list_validation(ws,"H",["draft","review","approved","published","inactive"])
-    _list_validation(ws,"I",["SIM","NÃO"])
-    _list_validation(ws,"J",["NENHUM","NOVO","ATUALIZADO"])
-    guide=wb.create_sheet("INSTRUCOES")
-    guide_rows=[
-        ["CAMPO","REGRA"],
-        ["titulo","Obrigatório. Conteúdos com título idêntico são ignorados para evitar duplicação."],
-        ["corpo","Texto principal da aula."],
-        ["disciplina_ids","Opcional. IDs separados por |, ; ou vírgula."],
-        ["disciplinas","Opcional. Siglas exatas das disciplinas separadas por | ou ;."],
-        ["status","draft, review, approved, published ou inactive."],
-        ["aviso","NENHUM, NOVO ou ATUALIZADO."],
-        ["exigir_revisao","SIM ou NÃO."],
-        ["PDF","Para PDF não use esta planilha: envie um PDF textual pelo painel e selecione as disciplinas antes de validar."],
-        ["segurança","Não use fórmulas. O sistema valida o arquivo inteiro antes de permitir a gravação."],
-    ]
-    for row in guide_rows:guide.append(row)
-    _style_template(guide,{"A":26,"B":95})
-    ref=wb.create_sheet("DISCIPLINAS_ATUAIS");ref.append(["id","sigla","nome","status"])
-    for item in Discipline.objects.all().order_by("name").values("id","short_name","name","status")[:5000]:ref.append([item["id"],item["short_name"],item["name"],item["status"]])
-    _style_template(ref,{"A":12,"B":20,"C":48,"D":18})
-    out=BytesIO();wb.save(out);return out.getvalue()
