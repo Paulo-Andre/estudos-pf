@@ -6,7 +6,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from audit.models import AdminAuditLog
 from courses.models import Course
-from courses.permissions import HasContestAccess,HasStudyAccess
+from courses.permissions import HasContestAccess,HasStudyAccess,active_enrollments
 from knowledge.models import Content,Discipline,Question
 from knowledge.services import can_use_question,question_payload
 from .advanced_services import course_progress_payload,daily_quick_check,dismiss_daily_quick_check,mark_content_opened,mark_review_mastered,queue_review,rate_review,remove_review_item,remove_roadmap_item,resume_content,roadmap_payload,save_roadmap_item
@@ -30,6 +30,9 @@ class AnswerView(APIView):
             except (TypeError,ValueError):return Response({"detail":"Confiança deve ser 1, 2 ou 3."},status=400)
             if confidence not in (1,2,3):return Response({"detail":"Confiança deve ser 1, 2 ou 3."},status=400)
         course=Course.objects.filter(pk=request.data.get("courseId")).first() if request.data.get("courseId") else None
+        if not course:
+            enrolled=list(active_enrollments(request.user).select_related("course")[:2])
+            if len(enrolled)==1:course=enrolled[0].course
         payload=answer(request.user,qid,correct,confidence,course)
         if not correct:queue_question_error(request.user,qid,source="answer_error")
         return Response(payload)
