@@ -7,8 +7,9 @@ from rest_framework.test import APIClient
 from courses.models import Course,CourseEnrollment
 from knowledge.models import Content,CourseDiscipline,Discipline,DisciplineContent,Question,QuestionContentLink
 from .advanced_services import queue_review,rate_review
+from .intelligence_services import learning_intelligence
 from .learning_services import learning_plan
-from .models import StudyReviewItem
+from .models import SimulationRecord,StudyAnswer,StudyContentProgress,StudyReviewItem,StudySyllabusSnapshot
 
 
 class LearningMethodologyTests(TestCase):
@@ -100,3 +101,83 @@ class LearningMethodologyTests(TestCase):
             "confidence":5,
         },format="json")
         self.assertEqual(response.status_code,400)
+
+    def test_learning_intelligence_creates_radar_and_mastery_map(self):
+        client=APIClient();client.force_authenticate(self.user)
+        response=client.get(f"/api/v1/study/intelligence/?courseId={self.course.id}")
+        self.assertEqual(response.status_code,200)
+        self.assertEqual(response.data["radar"]["version"],1)
+        self.assertEqual(response.data["radar"]["totalTopics"],1)
+        self.assertEqual(response.data["mastery"]["disciplines"][0]["discipline"],"Constitucional")
+        self.assertEqual(StudySyllabusSnapshot.objects.filter(course=self.course).count(),1)
+
+    def test_radar_versions_when_published_content_changes(self):
+        first=learning_intelligence(self.user,self.course)
+        self.assertEqual(first["radar"]["version"],1)
+        self.content.title="Direitos fundamentais e garantias"
+        self.content.save()
+        second=learning_intelligence(self.user,self.course)
+        self.assertEqual(second["radar"]["version"],2)
+        self.assertEqual(second["radar"]["changes"]["updatedCount"],1)
+        self.assertEqual(StudySyllabusSnapshot.objects.filter(course=self.course).count(),2)
+
+    def test_error_coach_detects_overconfidence(self):
+        client=APIClient();client.force_authenticate(self.user)
+        for _ in range(5):
+            response=client.post("/api/v1/study/answer/",{
+                "questionId":f"central-{self.question.pk}",
+                "correct":False,
+                "confidence":3,
+            },format="json")
+            self.assertEqual(response.status_code,200)
+        intelligence=learning_intelligence(self.user,self.course)
+        self.assertEqual(intelligence["errorCoach"]["primaryPattern"]["id"],"overconfidence")
+        self.assertEqual(intelligence["errorCoach"]["wrong"],5)
+
+    def test_mastery_requires_spaced_evidence_for_retention(self):
+        StudyContentProgress.objects.create(
+            user=self.user,course=self.course,content=self.content,
+            status=StudyContentProgress.Status.COMPLETED,completed_at=timezone.now(),
+        )
+        answers=[
+            StudyAnswer.objects.create(
+                user=self.user,question_id=f"central-{self.question.pk}",correct=True,confidence=3,
+            )
+            for _ in range(5)
+        ]
+        StudyAnswer.objects.filter(pk__in=[item.pk for item in answers[:3]]).update(answered_at=timezone.now()-timedelta(days=3))
+        intelligence=learning_intelligence(self.user,self.course)
+        topic=intelligence["mastery"]["disciplines"][0]["topics"][0]
+        self.assertEqual(topic["state"],"retained")
+        self.assertGreaterEqual(topic["score"],80)
+        self.assertEqual(topic["correctDays"],2)
+
+    def test_real_exam_telemetry_is_sanitized_and_summarized(self):
+        client=APIClient();client.force_authenticate(self.user)
+        response=client.post("/api/v1/study/simulation/",{
+            "id":"sim-real-telemetry",
+            "courseId":self.course.id,
+            "mode":"real_exam",
+            "total":2,
+            "correct":1,
+            "errors":1,
+            "elapsedSeconds":75,
+            "byDiscipline":{"Constitucional":{"correct":1,"total":2}},
+            "byBlock":{"I":{"correct":1,"total":2}},
+            "questionIds":["a","b"],
+            "answers":[
+                {"questionId":"a","correct":True,"confidence":3},
+                {"questionId":"b","correct":False,"confidence":3},
+            ],
+            "telemetry":{"questions":[
+                {"questionId":"a","elapsedMs":20000,"changes":1,"confidence":3,"correct":True,"discipline":"Constitucional","subject":"Direitos fundamentais"},
+                {"questionId":"b","elapsedMs":55000,"changes":0,"confidence":3,"correct":False,"discipline":"Constitucional","subject":"Direitos fundamentais"},
+            ]},
+        },format="json")
+        self.assertEqual(response.status_code,200)
+        record=SimulationRecord.objects.get(pk="sim-real-telemetry")
+        self.assertEqual(record.course,self.course)
+        self.assertEqual(record.mode,SimulationRecord.Mode.REAL_EXAM)
+        self.assertEqual(record.telemetry_json["summary"]["answerChanges"],1)
+        self.assertEqual(record.telemetry_json["summary"]["highConfidenceErrors"],1)
+        self.assertEqual(record.telemetry_json["summary"]["performanceDrop"],100)
