@@ -1,6 +1,6 @@
 from django.urls import path
 from .views import (
-    AnswerView,BookmarkDetailView,BookmarkListView,CompleteView,ContentProgressView,CourseProgressView,DailyQuickCheckView,LearningPlanView,LearningIntelligenceView,
+    AnswerView,BookmarkDetailView,BookmarkListView,CompleteView,ContentProgressView,CourseProgressView,DailyQuickCheckView,LearningPlanView,LearningIntelligenceView,LearningFeaturesView,AdminLearningSettingsView,
     NoteView,ResumeView,ReviewDeleteView,ReviewItemsView,ReviewMasteredView,ReviewRateView,
     RoadmapDeleteView,RoadmapView,SimulationDetailView,SimulationReflectionView,StateView,StudyQuestionsView,
     SubmitSimulationView,WeeklyGoalView,
@@ -29,4 +29,6 @@ urlpatterns=[
     path("weekly-goal/",WeeklyGoalView.as_view()),
     path("learning-plan/",LearningPlanView.as_view()),
     path("intelligence/",LearningIntelligenceView.as_view()),
+    path("learning-features/",LearningFeaturesView.as_view()),
+    path("admin/intelligence-settings/",AdminLearningSettingsView.as_view()),
 ]
