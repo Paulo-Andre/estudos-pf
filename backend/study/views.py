@@ -20,7 +20,13 @@ class AnswerView(APIView):
     def post(self,request):
         qid=str(request.data.get("questionId") or "")[:80]
         correct=bool(request.data.get("correct"))
-        payload=answer(request.user,qid,correct)
+        raw_confidence=request.data.get("confidence")
+        confidence=None
+        if raw_confidence not in (None,""):
+            try:confidence=int(raw_confidence)
+            except (TypeError,ValueError):return Response({"detail":"Confiança deve ser 1, 2 ou 3."},status=400)
+            if confidence not in (1,2,3):return Response({"detail":"Confiança deve ser 1, 2 ou 3."},status=400)
+        payload=answer(request.user,qid,correct,confidence)
         if not correct:queue_question_error(request.user,qid,source="answer_error")
         return Response(payload)
 class CompleteView(APIView):
