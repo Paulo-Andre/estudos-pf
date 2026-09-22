@@ -103,6 +103,10 @@ def learning_plan(user,course):
     accuracy=round(sum(accuracy_values)/len(accuracy_values)) if accuracy_values else (sim_accuracy if sim_accuracy is not None else 0)
     readiness=round(progress_percent*0.4+accuracy*0.4+review_health*0.2) if (contents or accuracy_values or reviews) else 0
 
+    exam_days=None
+    if prefs.exam_date:
+        exam_days=(prefs.exam_date-today).days
+
     recommendations=[]
     if due:
         recommendations.append({"type":"review","priority":1,"title":f"Revise {len(due)} item(ns) vencido(s)","detail":"Comece pelas lembranças que estão no ponto de esquecimento.","cta":"Revisar agora"})
@@ -138,5 +142,7 @@ def learning_plan(user,course):
             "questionGoal":prefs.weekly_goal_questions,
             "studyDaysThisWeek":days_week,
             "studyDayGoal":prefs.weekly_goal_days,
+            "examDays":exam_days,
+            "intensity":"reta_final" if exam_days is not None and 0 <= exam_days <= 30 else "acelerado" if exam_days is not None and 31 <= exam_days <= 90 else "base",
         },
     }

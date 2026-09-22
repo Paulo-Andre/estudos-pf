@@ -59,3 +59,13 @@ class LearningMethodologyTests(TestCase):
         self.assertEqual(response.status_code,200)
         self.assertEqual(response.data["lastRating"],"easy")
         self.assertGreaterEqual(response.data["intervalDays"],7)
+
+
+    def test_learning_plan_exposes_exam_horizon(self):
+        from accounts.models import AccountPreferences
+        prefs,_=AccountPreferences.objects.get_or_create(user=self.user)
+        prefs.exam_date=timezone.localdate()+timedelta(days=21)
+        prefs.save(update_fields=["exam_date"])
+        plan=learning_plan(self.user,self.course)
+        self.assertEqual(plan["metrics"]["examDays"],21)
+        self.assertEqual(plan["metrics"]["intensity"],"reta_final")
