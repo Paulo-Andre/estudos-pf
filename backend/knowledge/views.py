@@ -23,7 +23,15 @@ def content_json(c):
 
 def full_question_json(q):
     payload=question_payload(q)
-    payload["contentIds"]=list(q.content_links.values_list("content_id",flat=True))
+    links=list(q.content_links.select_related("content").prefetch_related("content__discipline_links__discipline"))
+    contents=[link.content for link in links]
+    disciplines=[]
+    for content in contents:
+        for dlink in content.discipline_links.all():
+            if dlink.discipline.name not in disciplines:disciplines.append(dlink.discipline.name)
+    payload["contentIds"]=[content.id for content in contents]
+    payload["discipline"]=disciplines[0] if disciplines else "Biblioteca central"
+    payload["subject"]=" · ".join(content.title for content in contents) or "Conteúdo geral"
     return payload
 
 class CourseLibraryView(APIView):
