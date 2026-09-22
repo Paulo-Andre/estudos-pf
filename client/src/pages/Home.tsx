@@ -380,6 +380,22 @@ function StudyWorkspace({ user, logout, initialView, initialCommercePlanId, onCo
       setSimulationNotice("Não há questões suficientes para iniciar este modo.");
       return;
     }
+    if (mode === "domain" && (!learningFeatures?.enabled || !learningFeatures.domainProofEnabled)) {
+      setSimulationNotice("A Prova de Domínio está desativada para este curso.");
+      return;
+    }
+    if (mode === "real_exam" && (!learningFeatures?.enabled || !learningFeatures.realExamEnabled)) {
+      setSimulationNotice("O Modo Prova Real está desativado para este curso.");
+      return;
+    }
+    if (mode === "domain" && learningFeatures && total > learningFeatures.domainProofQuestionCount) total = learningFeatures.domainProofQuestionCount;
+    if (mode === "real_exam" && learningFeatures) {
+      if (total < learningFeatures.realExamMinQuestions) {
+        setSimulationNotice(`O Modo Prova Real exige pelo menos ${learningFeatures.realExamMinQuestions} questões neste curso.`);
+        return;
+      }
+      total = Math.min(total, learningFeatures.realExamQuestionCount);
+    }
     const strictReviewMode = centralQuestionsQuery.data?.requiresReviewMode === true;
     const bank = persistentSimulationQuestions.filter(item => (!focusDiscipline || item.discipline === focusDiscipline) && (!focusSubject || item.subject.includes(focusSubject)));
     const questions = selectBalancedBooleanQuestions(bank, total, state.usedQuestionIds);
@@ -399,6 +415,7 @@ function StudyWorkspace({ user, logout, initialView, initialCommercePlanId, onCo
     const isRealExam = simulation.mode === "real_exam";
     const nextAnswers = (!hasSelectedAnswer || isRealExam) ? { ...simulation.answers, [question.id]: answer } : simulation.answers;
     const nextConfidences = (!hasSelectedAnswer || isRealExam) ? { ...simulation.confidences, [question.id]: confidence } : simulation.confidences;
+    const shouldTrackTelemetry = !isRealExam || simulation.telemetryEnabled;
     const telemetryItem: SimulationTelemetryItem = simulation.telemetry[question.id] ?? {
       questionId: question.id,
       elapsedMs: Math.max(0, itemTelemetry?.elapsedMs ?? (Date.now() - simulation.questionStartedAt)),
@@ -408,7 +425,7 @@ function StudyWorkspace({ user, logout, initialView, initialCommercePlanId, onCo
       discipline: question.discipline,
       subject: question.subject,
     };
-    const nextTelemetry = { ...simulation.telemetry, [question.id]: telemetryItem };
+    const nextTelemetry = shouldTrackTelemetry ? { ...simulation.telemetry, [question.id]: telemetryItem } : simulation.telemetry;
 
     if (!isRealExam && !hasSelectedAnswer) {
       setSimulation({ ...simulation, answers: nextAnswers, confidences: nextConfidences, telemetry: nextTelemetry });
@@ -434,7 +451,7 @@ function StudyWorkspace({ user, logout, initialView, initialCommercePlanId, onCo
       answerRecords.push({ questionId: item.id, courseId: effectiveContestId, correct: isCorrect, confidence: nextConfidences[item.id] ?? null, answeredAt: new Date().toISOString() });
     });
 
-    const telemetryQuestions = simulation.questions.map(item => nextTelemetry[item.id]).filter(Boolean) as SimulationTelemetryItem[];
+    const telemetryQuestions = shouldTrackTelemetry ? simulation.questions.map(item => nextTelemetry[item.id]).filter(Boolean) as SimulationTelemetryItem[] : [];
     const half = Math.max(1, Math.floor(telemetryQuestions.length / 2));
     const firstHalf = telemetryQuestions.slice(0, half);
     const secondHalf = telemetryQuestions.slice(half).length ? telemetryQuestions.slice(half) : firstHalf;
