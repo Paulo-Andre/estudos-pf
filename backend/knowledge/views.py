@@ -1,4 +1,5 @@
 from django.db import IntegrityError,transaction
+from django.http import HttpResponse
 from django.db.models import Q
 from rest_framework import permissions,status
 from rest_framework.parsers import FormParser,MultiPartParser
@@ -10,7 +11,7 @@ from courses.models import Course
 from courses.permissions import has_active_enrollment
 from .models import Content,ContentChangelog,CourseDiscipline,Discipline,DisciplineContent,Question,QuestionChangelog,QuestionContentLink,ReviewQueue
 from .services import can_use_question,decide_review,question_payload,submit_for_review
-from .import_services import apply_content_import,apply_pdf_content,apply_question_import,import_summary,parse_content_xlsx,parse_question_xlsx,pdf_to_content
+from .import_services import apply_content_import,apply_pdf_content,apply_question_import,content_template_bytes,import_summary,parse_content_xlsx,parse_question_xlsx,pdf_to_content,question_template_bytes
 
 def discipline_json(d):
     return {"id":d.id,"name":d.name,"shortName":d.short_name,"description":d.description,"status":d.status,
@@ -139,6 +140,19 @@ class ContentChangelogView(APIView):
     def get(self,request,content_id):
         qs=ContentChangelog.objects.filter(content_id=content_id).order_by("-created_at")[:200]
         return Response([{"id":x.id,"actorUserId":x.actor_id,"changedField":x.changed_field,"oldValue":x.old_value,"newValue":x.new_value,"createdAt":x.created_at} for x in qs])
+
+class AdminImportTemplateView(APIView):
+    permission_classes=[permissions.IsAdminUser]
+    def get(self,request,kind):
+        if kind=="questions":
+            data=question_template_bytes();filename="modelo_importacao_questoes.xlsx"
+        elif kind=="contents":
+            data=content_template_bytes();filename="modelo_importacao_conteudos.xlsx"
+        else:return Response({"detail":"Modelo não encontrado."},status=404)
+        response=HttpResponse(data,content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        response["Content-Disposition"]=f'attachment; filename="{filename}"'
+        response["Cache-Control"]="no-store"
+        return response
 
 class AdminQuestionImportView(APIView):
     permission_classes=[permissions.IsAdminUser]
