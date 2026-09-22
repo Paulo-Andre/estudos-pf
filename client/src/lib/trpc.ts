@@ -80,7 +80,7 @@ async function uploadKnowledgeImport(input: any, endpoint: string) {
   const form=new FormData();
   form.append("file",file,file.name);
   form.append("dryRun",input?.dryRun===false?"false":"true");
-  for (const key of ["title","objective","description","cardText","status","requiresReview"]) {
+  for (const key of ["title","objective","description","cardText","coverImageUrl","videoUrl","videoLabel","materialUrl","materialLabel","noticeKind","status","requiresReview"]) {
     if (input?.[key] !== undefined && input?.[key] !== null) form.append(key,String(input[key]));
   }
   if (Array.isArray(input?.disciplineIds)) form.append("disciplineIds",input.disciplineIds.join(","));
