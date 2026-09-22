@@ -16,7 +16,7 @@ def state(user):
     p=profile(user);sims=list(SimulationRecord.objects.filter(user=user).select_related("reflection").order_by("completed_at"))
     week_start=timezone.now()-timedelta(days=7)
     return {"completedModules":[x.module_id for x in CompletedModule.objects.filter(user=user)],
-    "answers":[{"questionId":x.question_id,"correct":x.correct,"confidence":x.confidence,"answeredAt":x.answered_at.isoformat()} for x in StudyAnswer.objects.filter(user=user).order_by("answered_at")],
+    "answers":[{"questionId":x.question_id,"courseId":x.course_id,"correct":x.correct,"confidence":x.confidence,"answeredAt":x.answered_at.isoformat()} for x in StudyAnswer.objects.filter(user=user).order_by("answered_at")],
     "simulations":[{"id":x.id,"date":x.completed_at.isoformat(),"courseId":x.course_id,"mode":x.mode,"total":x.total,"correct":x.correct,"errors":x.errors,"elapsedSeconds":x.elapsed_seconds,"byDiscipline":x.by_discipline,"byBlock":x.by_block,"telemetry":x.telemetry_json,"reflection":_reflection_payload(x)} for x in sims],
     "xp":p.xp,"lastStudyDate":p.last_study_date.isoformat() if p.last_study_date else None,"studyDates":p.study_dates,"usedQuestionIds":p.used_question_ids,
     "weeklySimulationCorrect":sum(x.correct for x in sims if x.completed_at>=week_start)}
@@ -24,8 +24,9 @@ def activity(user,xp,questions=()):
     p=profile(user);today=date.today();p.xp+=max(0,int(xp));p.last_study_date=today
     p.study_dates=list(dict.fromkeys([*p.study_dates,today.isoformat()]));p.used_question_ids=list(dict.fromkeys([*p.used_question_ids,*[str(q) for q in questions]]));p.save()
 @transaction.atomic
-def answer(user,qid,correct,confidence=None):
-    StudyAnswer.objects.create(user=user,question_id=qid,correct=correct,confidence=confidence);activity(user,8 if correct else 2);return state(user)
+def answer(user,qid,correct,confidence=None,course=None):
+    if course and not has_active_enrollment(user,course.id):raise ValueError("Curso da resposta inválido ou sem matrícula vigente.")
+    StudyAnswer.objects.create(user=user,course=course,question_id=qid,correct=correct,confidence=confidence);activity(user,8 if correct else 2);return state(user)
 @transaction.atomic
 def complete(user,module):
     _,created=CompletedModule.objects.get_or_create(user=user,module_id=module)
@@ -82,6 +83,18 @@ def submit_simulation(user,data):
     if course_id and (not course or not has_active_enrollment(user,course.id)):raise ValueError("Curso do simulado inválido ou sem matrícula vigente.")
     mode=str(data.get("mode") or SimulationRecord.Mode.PRACTICE)
     if mode not in SimulationRecord.Mode.values:raise ValueError("Modo de simulado inválido.")
+    if course and mode in {SimulationRecord.Mode.DOMAIN,SimulationRecord.Mode.REAL_EXAM}:
+        from .intelligence_services import learning_settings
+        settings=learning_settings(course)
+        if not settings.is_active:raise ValueError("A Inteligência de estudo está desativada para este curso.")
+        if mode==SimulationRecord.Mode.DOMAIN:
+            if not settings.domain_proof_enabled:raise ValueError("A Prova de Domínio está desativada para este curso.")
+            if total>settings.domain_proof_question_count:raise ValueError("A Prova de Domínio excede o limite configurado para este curso.")
+        if mode==SimulationRecord.Mode.REAL_EXAM:
+            if not settings.real_exam_enabled:raise ValueError("O Modo Prova Real está desativado para este curso.")
+            if total<settings.real_exam_min_questions or total>settings.real_exam_question_count:
+                raise ValueError("Quantidade de questões fora dos limites configurados para a Prova Real.")
+            if not settings.telemetry_enabled:data={**data,"telemetry":{}}
     telemetry=_simulation_telemetry(data,total)
     record=SimulationRecord.objects.create(id=sid,user=user,course=course,mode=mode,total=total,correct=correct,errors=errors,elapsed_seconds=max(0,int(data.get("elapsedSeconds") or 0)),
         by_discipline=dict(data.get("byDiscipline") or {}),by_block=dict(data.get("byBlock") or {}),telemetry_json=telemetry)
@@ -89,6 +102,7 @@ def submit_simulation(user,data):
     StudyAnswer.objects.bulk_create([
         StudyAnswer(
             user=user,
+            course=course,
             question_id=str(item.get("questionId") or "")[:80],
             correct=bool(item.get("correct")),
             confidence=int(item.get("confidence")) if str(item.get("confidence") or "").isdigit() and 1<=int(item.get("confidence"))<=3 else None,
