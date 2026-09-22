@@ -425,19 +425,28 @@ def content_template_bytes():
     _list_validation(ws,"I",["SIM","NÃO"])
     _list_validation(ws,"J",["NENHUM","NOVO","ATUALIZADO"])
     examples=wb.create_sheet("EXEMPLOS");examples.append(headers)
-    examples.append(["Direitos Fundamentais","Compreender os principais direitos e garantias.","Resumo do conteúdo para administração.","Texto curto exibido no cartão do aluno.","Insira aqui o conteúdo completo da aula. Pode usar parágrafos e listas em texto.","","","draft","NÃO","NENHUM","","","","",""])
+    examples.append(["Direitos Fundamentais","Compreender os principais direitos e garantias.","Resumo pedagógico para administração.","Texto curto exibido no cartão do aluno.","Insira aqui o conteúdo completo da aula. Pode usar parágrafos e listas em texto.","","const","draft","NÃO","NENHUM","https://exemplo.com/capa.webp","https://www.youtube.com/watch?v=EXEMPLO","Assistir videoaula","https://exemplo.com/material-aula.pdf","Baixar PDF da aula"])
     _style_template(examples,{"A":36,"B":42,"C":48,"D":40,"E":90,"F":20,"G":28,"H":18,"I":18,"J":18,"K":34,"L":34,"M":24,"N":34,"O":24})
     guide=wb.create_sheet("INSTRUCOES")
     guide_rows=[
         ["CAMPO","REGRA"],
-        ["titulo","Obrigatório. Conteúdos com título idêntico são ignorados para evitar duplicação."],
-        ["corpo","Texto principal da aula."],
+        ["titulo","Obrigatório. Título principal da aula/conteúdo. Títulos idênticos já existentes são ignorados."],
+        ["objetivo","Opcional. Objetivo de aprendizagem da aula."],
+        ["descricao","Opcional. Resumo pedagógico/administrativo mais detalhado."],
+        ["resumo_card","Opcional. Texto curto exibido no card do aluno."],
+        ["corpo","Opcional no Excel, mas recomendado. Texto principal completo da aula."],
         ["disciplina_ids","Opcional. IDs separados por |, ; ou vírgula."],
         ["disciplinas","Opcional. Siglas exatas das disciplinas separadas por | ou ;."],
         ["status","draft, review, approved, published ou inactive."],
-        ["aviso","NENHUM, NOVO ou ATUALIZADO."],
         ["exigir_revisao","SIM ou NÃO."],
-        ["PDF","Para PDF, envie um arquivo textual. O modelo estruturado pode usar TITULO:, OBJETIVO:, DESCRICAO:, RESUMO_CARD: e CONTEUDO:."],
+        ["aviso","NENHUM, NOVO ou ATUALIZADO."],
+        ["capa_url","Opcional. URL HTTPS da imagem de capa/card."],
+        ["video_url","Opcional. Link HTTPS da videoaula ou vídeo complementar."],
+        ["video_rotulo","Opcional. Texto do botão do vídeo, por exemplo: Assistir videoaula."],
+        ["material_url","Opcional. Link HTTPS do PDF, apostila ou outro material para download."],
+        ["material_rotulo","Opcional. Texto do botão, por exemplo: Baixar PDF da aula."],
+        ["PDF estruturado","Também reconhece TITULO:, OBJETIVO:, DESCRICAO:, RESUMO_CARD:, CAPA_URL:, VIDEO_URL:, VIDEO_ROTULO:, MATERIAL_URL:, MATERIAL_ROTULO:, AVISO: e CONTEUDO:."],
+        ["automático","Data de criação, atualização e usuário responsável são preenchidos pelo sistema e não precisam constar no arquivo."],
         ["segurança","Não use fórmulas. O sistema valida o arquivo inteiro antes de permitir a gravação."],
     ]
     for row in guide_rows:guide.append(row)
