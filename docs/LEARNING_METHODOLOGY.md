@@ -112,3 +112,12 @@ Toda nova questão deve ter explicação suficiente para transformar o erro em a
 - manter controles acessíveis em celular;
 - evitar notificações ou mecânicas que estimulem uso compulsivo;
 - permitir ao aluno ignorar uma recomendação e escolher outra atividade.
+
+
+## Mapa de Domínio do Edital
+
+O mapa apresenta uma estimativa pedagógica por disciplina combinando cobertura do conteúdo, evidência de questões/simulados e saúde da repetição espaçada.
+
+Os estados são **não iniciado**, **crítico**, **em desenvolvimento** e **consolidando**. O nível de evidência (baixa, média ou alta) é exibido para evitar falsa precisão quando ainda há poucas questões respondidas.
+
+O indicador não representa probabilidade de aprovação. Ele serve para priorizar recuperação ativa, revisão e prática deliberada.

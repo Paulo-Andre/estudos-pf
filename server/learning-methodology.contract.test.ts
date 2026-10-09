@@ -59,6 +59,12 @@ describe("contrato da metodologia de aprendizagem", () => {
     expect(trpcSource).toContain("/reflection/");
   });
 
+  it("mantém o Mapa de Domínio do Edital nas áreas principais", () => {
+    expect(homeSource).toContain("MAPA DE DOMÍNIO DO EDITAL");
+    expect(homeSource).toContain("learningPlan.masteryMap");
+    expect(homeSource).toContain("domínio");
+  });
+
   it("mantém endpoints REST do plano adaptativo", () => {
     expect(trpcSource).toContain('case "study.learningPlan"');
     expect(trpcSource).toContain("/api/v1/study/learning-plan/");

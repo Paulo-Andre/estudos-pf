@@ -100,6 +100,70 @@ def _metacognition(user):
         label="calibrada";tip="Sua percepção está razoavelmente alinhada ao desempenho. Continue usando a confiança como sinal de revisão."
     return {"sample":len(answers),"score":score,"label":label,"overconfident":over,"underconfident":under,"tip":tip}
 
+
+def _mastery_map(contents,weaknesses,reviews):
+    simulation_by_name={str(row["discipline"]).strip().casefold():row for row in weaknesses}
+    progress_by_name={}
+    for item in contents:
+        name=str(item.get("disciplineName") or "Sem disciplina").strip() or "Sem disciplina"
+        bucket=progress_by_name.setdefault(name,{"total":0,"completed":0})
+        bucket["total"]+=1
+        if item.get("progress") and item["progress"].get("status")=="completed":
+            bucket["completed"]+=1
+
+    reviews_by_name={}
+    now=timezone.now()
+    for item in reviews:
+        snapshot=item.snapshot_json or {}
+        name=str(snapshot.get("discipline") or "").strip()
+        if not name:continue
+        bucket=reviews_by_name.setdefault(name.casefold(),{"pending":0,"due":0})
+        bucket["pending"]+=1
+        if item.due_at is None or item.due_at<=now:
+            bucket["due"]+=1
+
+    rows=[]
+    for name,progress in progress_by_name.items():
+        coverage=round(progress["completed"]*100/progress["total"]) if progress["total"] else 0
+        evidence=simulation_by_name.get(name.casefold())
+        accuracy=int(evidence["accuracy"]) if evidence else None
+        answered=int(evidence["total"]) if evidence else 0
+        review=reviews_by_name.get(name.casefold(),{"pending":0,"due":0})
+        review_health=max(0,round((review["pending"]-review["due"])*100/review["pending"])) if review["pending"] else 100
+
+        if answered>=5:
+            score=round(coverage*0.35+(accuracy or 0)*0.50+review_health*0.15)
+            evidence_level="alta"
+        elif answered>0:
+            score=round(coverage*0.55+(accuracy or 0)*0.30+review_health*0.15)
+            evidence_level="media"
+        else:
+            score=min(74,round(coverage*0.80+review_health*0.20))
+            evidence_level="baixa"
+
+        if coverage==0 and answered==0:
+            status="nao_iniciado"
+        elif score<50:
+            status="critico"
+        elif score<75:
+            status="desenvolvimento"
+        else:
+            status="consolidando"
+
+        rows.append({
+            "discipline":name,
+            "score":max(0,min(100,score)),
+            "status":status,
+            "evidence":evidence_level,
+            "coverage":coverage,
+            "accuracy":accuracy,
+            "answeredQuestions":answered,
+            "pendingReviews":review["pending"],
+            "dueReviews":review["due"],
+        })
+    return sorted(rows,key=lambda row:(row["score"],row["discipline"].casefold()))
+
+
 def learning_plan(user,course):
     if not has_active_enrollment(user,course.id):raise PermissionError("Matrícula vigente necessária.")
     progress=course_progress_payload(user,course)
@@ -161,12 +225,16 @@ def learning_plan(user,course):
         ]
 
     metacognition=_metacognition(user)
+    mastery_map=_mastery_map(contents,weaknesses,reviews)
+    mastery_priority=next((row for row in mastery_map if row["status"] in {"critico","desenvolvimento"}),None)
 
     recommendations=[]
     if due:
         recommendations.append({"type":"review","priority":1,"title":f"Revise {len(due)} item(ns) vencido(s)","detail":"Comece pelas lembranças que estão no ponto de esquecimento.","cta":"Revisar agora"})
     if weak:
         recommendations.append({"type":"practice","priority":2,"title":f"Pratique {weak['discipline']}","detail":f"Seu aproveitamento recente é {weak['accuracy']}%. Faça recuperação ativa antes de reler teoria.","cta":"Praticar questões"})
+    elif mastery_priority:
+        recommendations.append({"type":"practice","priority":2,"title":f"Fortaleça {mastery_priority['discipline']}","detail":f"Mapa de domínio em {mastery_priority['score']}% com evidência {mastery_priority['evidence']}. Combine recuperação ativa e questões.","cta":"Fortalecer domínio"})
     if progress.get("continueItem"):
         recommendations.append({"type":"learn","priority":3,"title":"Avance na próxima aula","detail":progress["continueItem"]["title"],"cta":"Continuar conteúdo","contentId":progress["continueItem"]["id"]})
     last_sim_days=None
@@ -192,6 +260,7 @@ def learning_plan(user,course):
         "recommendations":recommendations[:4],
         "dueReviews":[_review_payload(item) for item in due[:5]],
         "weaknesses":weaknesses[:5],
+        "masteryMap":mastery_map,
         "metrics":{
             "readiness":readiness,
             "progressPercent":progress_percent,
