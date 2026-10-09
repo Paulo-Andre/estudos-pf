@@ -15,5 +15,7 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["server/**/*.test.ts", "server/**/*.spec.ts", "client/src/**/*.test.ts"],
+    // Integration files share one disposable MySQL schema in CI.
+    fileParallelism: false,
   },
 });

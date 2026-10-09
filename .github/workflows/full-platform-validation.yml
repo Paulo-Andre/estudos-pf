@@ -3,6 +3,8 @@ name: Full platform validation
 on:
   pull_request:
     branches: [main]
+  push:
+    branches: ["codex/**"]
 
 jobs:
   node-platform:

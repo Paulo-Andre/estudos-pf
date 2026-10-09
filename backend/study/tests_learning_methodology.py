@@ -100,3 +100,14 @@ class LearningMethodologyTests(TestCase):
             "confidence":5,
         },format="json")
         self.assertEqual(response.status_code,400)
+
+
+    def test_mastery_map_combines_coverage_and_practice(self):
+        plan=learning_plan(self.user,self.course)
+        self.assertEqual(len(plan["masteryMap"]),1)
+        item=plan["masteryMap"][0]
+        self.assertEqual(item["discipline"],"Constitucional")
+        self.assertIn(item["status"],{"nao_iniciado","critico","desenvolvimento","consolidando"})
+        self.assertIn(item["evidence"],{"baixa","media","alta"})
+        self.assertGreaterEqual(item["score"],0)
+        self.assertLessEqual(item["score"],100)
