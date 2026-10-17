@@ -24,7 +24,7 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Audit Node dependencies
         run: pnpm audit --audit-level high
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
           cache: pip

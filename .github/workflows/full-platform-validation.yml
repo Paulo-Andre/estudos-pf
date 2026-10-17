@@ -89,7 +89,7 @@ jobs:
       DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
           cache: pip
@@ -134,7 +134,7 @@ jobs:
       DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
           cache: pip
@@ -201,7 +201,7 @@ jobs:
         run: pnpm exec tsx scripts/ci-seed-node.ts
       - name: Seed representative legacy data
         run: pnpm exec tsx scripts/ci-seed-legacy-migration.ts
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
           cache: pip
