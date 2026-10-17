@@ -46,7 +46,7 @@ jobs:
       - name: Export protected study seed
         run: pnpm exec tsx scripts/export-protected-study-seed.ts tmp/protected-study-seed.json
       - name: Upload protected study seed
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: protected-study-seed
           path: tmp/protected-study-seed.json
